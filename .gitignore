@@ -1,0 +1,37 @@
+# ============ Keil 编译产物（绝对不能提交）============
+MDK-ARM/TEST/
+MDK-ARM/Objects/
+MDK-ARM/Listings/
+MDK-ARM/DebugConfig/
+Objects/
+Listings/
+*.o
+*.d
+*.crf
+*.axf
+*.hex
+*.bin
+*.map
+*.htm
+*.lnp
+*.dep
+*.lst
+*.bak
+*.scvd
+JLinkLog.txt
+
+# ============ uVision 个人设置 ============
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.uvopt.bak
+
+# ============ IDE ============
+.vscode/
+.idea/
+
+# ============ 考核用不到的库（省 12MB）============
+Drivers/CMSIS/DSP/
+
+# ============ 系统文件 ============
+.DS_Store
+Thumbs.db
+desktop.ini
