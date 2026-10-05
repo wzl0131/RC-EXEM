@@ -25,6 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "can_motor.h"
 
 /* USER CODE END Includes */
 
@@ -165,10 +166,11 @@ void StartDefaultTask(void *argument)
 void startRemoteTask(void *argument)
 {
   /* USER CODE BEGIN startRemoteTask */
-  /* Infinite loop */
+  /* Heartbeat: red LED toggles every 500 ms */
   for(;;)
   {
-    osDelay(1);
+    HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
+    osDelay(500);
   }
   /* USER CODE END startRemoteTask */
 }
@@ -183,10 +185,11 @@ void startRemoteTask(void *argument)
 void StartControlTask(void *argument)
 {
   /* USER CODE BEGIN StartControlTask */
-  /* Infinite loop */
+  /* Heartbeat: green LED toggles every 100 ms */
   for(;;)
   {
-    osDelay(1);
+    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+    osDelay(100);
   }
   /* USER CODE END StartControlTask */
 }
@@ -201,10 +204,19 @@ void StartControlTask(void *argument)
 void StartDebugTask(void *argument)
 {
   /* USER CODE BEGIN StartDebugTask */
-  /* Infinite loop */
+  /* ---- Power-on indication ---- */
+  /* NOTE: the self-test functions are declared in can_motor.h but defined in
+   * can_motor.c, which YOU are going to write. Once your can_motor.c exists,
+   * call them here to verify your parsing on real hardware:
+   *   if (C620_SelfTest() != 0)      { red LED solid;      for(;;) osDelay(1000); }
+   *   if (AngleAccumSelfTest() != 0) { red LED fast blink; for(;;) osDelay(100);  }
+   */
+  HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+
+  /* Infinite loop: later this task will output curve data */
   for(;;)
   {
-    osDelay(1);
+    osDelay(1000);
   }
   /* USER CODE END StartDebugTask */
 }
