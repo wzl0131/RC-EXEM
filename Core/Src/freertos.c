@@ -26,7 +26,10 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "can_motor.h"
-
+#include "pid.h"
+#include "remote.h"
+#include "control.h"
+#include "debug.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +39,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+/* ④ 速度环的测试目标已废弃 —— 现在目标由 ⑦ 档位/摇杆映射给出（见 control.c）*/
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,7 +55,7 @@
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for remoteTask */
@@ -185,11 +188,31 @@ void startRemoteTask(void *argument)
 void StartControlTask(void *argument)
 {
   /* USER CODE BEGIN StartControlTask */
-  /* Heartbeat: green LED toggles every 100 ms */
+  uint32_t tick;
+
+  /* ---- ① 上电自测：在 main.c 的 USER CODE 2 里做
+   *      （必须在启动 CAN/串口接收【之前】，否则真实数据会搅乱假数据）*/
+
+  /* ---- ② 初始化控制逻辑（内含两路 PID 的 Pid_Init）---- */
+  Control_Init();
+
+  /* ---- ③ 1 kHz 控制循环 ----
+   * osDelayUntil 保证"每 1 ms 一次"，不会像 osDelay 那样累积漂移
+   * ⚠️ 必须和 control.h 里的 CONTROL_DT_S(0.001f) 一致 */
+  tick = osKernelGetTickCount();
   for(;;)
   {
-    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-    osDelay(100);
+    tick += 1U;
+    osDelayUntil(tick);
+
+    /* 所有决策逻辑都在 Control_Update() 里：
+     *   读档位 → 保护 → 算目标 → 位置环 → 速度环 → 发 CAN */
+    Control_Update();
+
+    /* ⭐ 把这一周期的数据记进 debug 结构体，给 J-Scope 看
+     * 放在这里而不是 Control_Update 里面，是因为保护触发时
+     * Control_Update 会提前 return，那样就看不到故障时的数据了 */
+    Debug_Update();
   }
   /* USER CODE END StartControlTask */
 }
@@ -204,25 +227,46 @@ void StartControlTask(void *argument)
 void StartDebugTask(void *argument)
 {
   /* USER CODE BEGIN StartDebugTask */
-  /* ---- Power-on indication ---- */
-  /* NOTE: the self-test functions are declared in can_motor.h but defined in
-   * can_motor.c, which YOU are going to write. Once your can_motor.c exists,
-   * call them here to verify your parsing on real hardware:
-   *   if (C620_SelfTest() != 0)      { red LED solid;      for(;;) osDelay(1000); }
-   *   if (AngleAccumSelfTest() != 0) { red LED fast blink; for(;;) osDelay(100);  }
-   */
-  HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
-
-  /* Infinite loop: later this task will output curve data */
+  /* 心跳：绿灯每 500 ms 翻转一次，表示系统在跑
+   * 注意：六个上电自测已经移到 main.c 的 USER CODE 2 里，
+   *       并且在启动 CAN/串口接收【之前】执行 */
   for(;;)
   {
-    osDelay(1000);
+    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+    osDelay(500);
   }
   /* USER CODE END StartDebugTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
+/* ============================================================================
+ * FreeRTOS 钩子函数（hook）
+ * ==========================================================================*/
+
+/* ⭐ 栈溢出时被调用（需要 FreeRTOSConfig.h 里 configCHECK_FOR_STACK_OVERFLOW > 0）
+ * 现象：红灯常亮 + 卡死
+ * 排查：看是哪个任务溢出了（把 pcTaskName 加到 Watch 窗口，或者在这里下断点）*/
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+  (void)xTask;
+  (void)pcTaskName;
+  HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+  for(;;) { }
+}
+
+/* ⭐ FreeRTOS 堆耗尽时被调用（configUSE_MALLOC_FAILED_HOOK = 1）
+ * 现象：红灯快闪 + 卡死
+ * 原因：configTOTAL_HEAP_SIZE(15360) 不够，或者创建任务/队列失败 */
+void vApplicationMallocFailedHook(void)
+{
+  for(;;)
+  {
+    HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
+    HAL_Delay(100);
+  }
+}
 
 /* USER CODE END Application */
 

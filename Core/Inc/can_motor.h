@@ -1,4 +1,4 @@
-#ifndef CAN_MOTOR_H        
+﻿#ifndef CAN_MOTOR_H        
 #define CAN_MOTOR_H       
 
 #include <stdint.h>

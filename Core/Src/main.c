@@ -26,6 +26,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "can_motor.h"
+#include "pid.h"
+#include "remote.h"
+#include "control.h"
+#include "protection.h"
+#include "debug.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -93,7 +98,52 @@ int main(void)
   MX_CAN1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  /* ==========================================================================
+   * ① 上电自测 —— 必须在【启动任何接收】之前做！
+   *    原因：如果先启动了 CAN / 串口接收，真实数据会在自测过程中串进来，
+   *          把自测的假数据搅乱 → 出现"偶发的假失败"，上机时很难查
+   *
+   * 失败时的红灯暗号（此时 RTOS 还没启动，所以只能用 HAL_Delay）：
+   *    常亮        = CAN 大端解析错了
+   *    闪 500 ms   = 过零累计错了
+   *    闪 100 ms   = PID 数学错了
+   *    闪 50 ms    = SBUS 解析错了
+   * ==========================================================================*/
+  if (C620_SelfTest() != 0)
+  {
+    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+    for (;;) { }                                     /* 红灯常亮 */
+  }
+  if (AngleAccumSelfTest() != 0)
+  {
+    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(500); }
+  }
+  if (Pid_SelfTest() != 0)
+  {
+    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(100); }
+  }
+  if (Remote_SelfTest() != 0)
+  {
+    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(50); }
+  }
+  if (Control_SelfTest() != 0)      /* 档位判断 / 摇杆映射 / 斜坡限速 */
+  {
+    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(200); }
+  }
+  if (Protection_SelfTest() != 0)   /* 过温 / 越限 / 堵转 / 故障锁存 */
+  {
+    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(300); }
+  }
+  if (Debug_SelfTest() != 0)        /* J-Scope 用的数据搬运 */
+  {
+    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(400); }
+  }
+
+  /* ==========================================================================
+   * ② 自测全部通过 → 才启动接收
+   * ==========================================================================*/
   C620_CanInit();          /* 配滤波器 + 启动 CAN + 打开接收中断 */
+  Remote_StartReceive();   /* 启动 USART1 单字节中断接收（SBUS）*/
   /* USER CODE END 2 */
 
   /* Init scheduler */
