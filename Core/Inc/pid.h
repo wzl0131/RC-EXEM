@@ -106,6 +106,14 @@ void  Pid_Init(Pid_t *p, float kp, float ki, float kd, float out_max, float i_ma
  * 什么时候用：切换档位（SWA5 上下拨）时调用，避免残留的积分造成冲击 */
 void  Pid_Reset(Pid_t *p);
 
+/* ⭐ 把"上次测量值 last_actual"同步成当前测量值
+ *   Pid_Reset 故意不清 last_actual，但位置环在非位置模式下【不会】被调用，
+ *   于是 last_actual 会停在上次位置模式的角度上。
+ *   切回位置模式时，D 项就会算出 (当前角度 - 很久以前的角度)/dt → 巨大冲击。
+ *   → 所以在非位置模式时，每个周期都同步一次 pid_angle
+ * 什么时候用：Control_RemoteUpdate() 里，非位置模式的分支 */
+void  Pid_SyncActual(Pid_t *p, float actual);
+
 /* 算一次 PID 输出，返回值 = 限幅后的输出
  *   target : 目标值（想要的）
  *   actual : 测量值（现在的）

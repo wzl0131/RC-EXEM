@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+﻿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * File Name          : freertos.c
@@ -169,11 +169,21 @@ void StartDefaultTask(void *argument)
 void startRemoteTask(void *argument)
 {
   /* USER CODE BEGIN startRemoteTask */
-  /* Heartbeat: red LED toggles every 500 ms */
+  uint32_t tick;
+
+  /* ==========================================================================
+   * ⭐ remoteTask —— 考核要求里的"接收遥控器指令"任务
+   *    每 10 ms 跑一次：
+   *      读 remote.ch[] → 判档位（SWA5）→ 算摇杆目标 → 存到全局
+   *    （SBUS 的字节接收在 USART1 中断里完成，这里只做"解读"）
+   * ========================================================================== */
+  tick = osKernelGetTickCount();
   for(;;)
   {
-    HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
-    osDelay(500);
+    tick += 10U;                 /* 10 ms → 100 Hz，够跟遥控器（约 14ms 一帧）*/
+    osDelayUntil(tick);
+
+    Control_RemoteUpdate();      /* 读遥控 + 判档位 + 算目标 */
   }
   /* USER CODE END startRemoteTask */
 }
@@ -190,13 +200,10 @@ void StartControlTask(void *argument)
   /* USER CODE BEGIN StartControlTask */
   uint32_t tick;
 
-  /* ---- ① 上电自测：在 main.c 的 USER CODE 2 里做
-   *      （必须在启动 CAN/串口接收【之前】，否则真实数据会搅乱假数据）*/
+  /* ---- ① 上电自测 + Control_Init()：都在 main.c 的 USER CODE 2 里做
+   *      （自测必须在启动 CAN/串口接收之前，否则真实数据会搅乱假数据）*/
 
-  /* ---- ② 初始化控制逻辑（内含两路 PID 的 Pid_Init）---- */
-  Control_Init();
-
-  /* ---- ③ 1 kHz 控制循环 ----
+  /* ---- ② 1 kHz 控制循环 ----
    * osDelayUntil 保证"每 1 ms 一次"，不会像 osDelay 那样累积漂移
    * ⚠️ 必须和 control.h 里的 CONTROL_DT_S(0.001f) 一致 */
   tick = osKernelGetTickCount();

@@ -50,8 +50,7 @@ typedef struct {
 
     /* ---------- 第 4 组：在线检测（判断电调有没有掉线）---------- */
     uint32_t last_rx_tick;      /* 最近一次收到反馈的时刻（单位：RTOS tick）*/
-		uint8_t  inited;
-    uint8_t  online;            /* 1 = 在线，0 = 掉线 */
+    uint8_t  inited;            /* 1 = 已经收到过至少一帧（只 0→1，单向，用于"第一帧"判断）*/
 
 } Motor3508_t;                  /* typedef：以后直接写 Motor3508_t 就能用 */
 
@@ -76,6 +75,14 @@ void M3508_UpdateAngle(Motor3508_t *m, uint16_t raw);
 
 /* 解析一帧反馈数据。返回 0 = 成功，-1 = 不是我们要的 ID */
 int  C620_ParseRx(uint32_t std_id, const uint8_t *data);
+
+/* 电调在线判断的超时时间：正常 1 ms 一帧，超过这个时间没收到就算掉线 */
+#define M3508_RX_TIMEOUT_MS     100U
+
+/* ⭐ 电调现在在线吗？（现算：收到过帧 + 没超时）
+ *   返回 1 = 在线；0 = 掉线
+ *   用【事实】last_rx_tick 现算，不存会过期的 online 字段 */
+int  M3508_IsOnline(void);
 
 /* 发送控制帧：给指定电调 ID 发送电流值 */
 void C620_SendCurrent(uint8_t motor_id, int16_t current);
