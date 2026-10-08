@@ -65,9 +65,13 @@
 #define CTRL_POS_SLEW_DEG_PER_S  360.0f
 #define CTRL_SPD_SLEW_RPM_PER_S  600.0f
 
-/* ---- 电流变化率限制（保护电调和机械，不让电流一步跳到底）----
- * 200000/s：从 0 到满量程 16384 约需 82 ms */
-#define CTRL_CURRENT_SLEW_PER_S  200000.0f
+/* ---- 电流变化率限制（不让电流一步跳到底）----
+ * 1000000/s：从 0 到满量程 16384 约需 16 ms
+ *
+ * 为什么需要：切档位的那一瞬间，速度环的目标会突然变（比如从 200rpm 变成 0），
+ * 电流会跟着跳一下。加了这个限制之后变成一个 16ms 的爬升，冲击小很多。
+ * 16 ms 相对整个响应过程（0.25 秒左右）很短，所以不会拖慢控制。 */
+#define CTRL_CURRENT_SLEW_PER_S  1000000.0f
 
 
 /* ============================================================================
@@ -95,7 +99,6 @@ void Control_RemoteUpdate(void);
 void Control_Update(void);
 
 /* 给 debug 模块读的接口（画曲线用）*/
-CtrlMode_t Control_GetMode(void);
 float      Control_GetTargetDeg(void);      /* 位置环目标，单位 度 */
 float      Control_GetTargetRpm(void);      /* 速度环目标，单位 输出轴 rpm */
 

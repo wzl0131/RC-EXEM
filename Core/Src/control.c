@@ -212,7 +212,6 @@ void Control_Update(void)
 /* ============================================================================
  * 五、给 debug 模块读的接口
  * ==========================================================================*/
-CtrlMode_t Control_GetMode(void)      { return s_mode;       }
 float      Control_GetTargetDeg(void) { return s_target_deg; }
 float      Control_GetTargetRpm(void) { return s_rpm_cmd;    }
 
