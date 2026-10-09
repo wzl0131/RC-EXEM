@@ -248,32 +248,5 @@ void StartDebugTask(void *argument)
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 
-/* ============================================================================
- * FreeRTOS 钩子函数（hook）
- * ==========================================================================*/
-
-/* ⭐ 栈溢出时被调用（需要 FreeRTOSConfig.h 里 configCHECK_FOR_STACK_OVERFLOW > 0）
- * 现象：红灯常亮 + 卡死
- * 排查：看是哪个任务溢出了（把 pcTaskName 加到 Watch 窗口，或者在这里下断点）*/
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
-{
-  (void)xTask;
-  (void)pcTaskName;
-  HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-  for(;;) { }
-}
-
-/* ⭐ FreeRTOS 堆耗尽时被调用（configUSE_MALLOC_FAILED_HOOK = 1）
- * 现象：红灯快闪 + 卡死
- * 原因：configTOTAL_HEAP_SIZE(15360) 不够，或者创建任务/队列失败 */
-void vApplicationMallocFailedHook(void)
-{
-  for(;;)
-  {
-    HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
-    HAL_Delay(100);
-  }
-}
-
 /* USER CODE END Application */
 

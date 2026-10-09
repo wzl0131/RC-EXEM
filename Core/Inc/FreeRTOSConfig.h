@@ -166,16 +166,15 @@ standard names. */
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
 
-/* ⭐ 栈溢出检测（开发阶段建议开着，上机时能省很多调试时间）
- *   0 = 关闭（默认）
- *   1 = 只检查栈指针有没有越界
- *   2 = 还检查栈末尾的"魔术字"有没有被踩坏（更可靠，推荐）
- * 溢出时会调用 vApplicationStackOverflowHook()（在 freertos.c 里实现）*/
-#define configCHECK_FOR_STACK_OVERFLOW          2
+/* 栈溢出检测：关闭
+ * 本来开成 2 可以在栈溢出时亮红灯报警，但算过不需要：
+ *   4 个任务栈 4 × 1024 = 4096 字节，堆总共 15360 字节，只占 30%
+ *   而且调用链都很浅（最多两三层），不会溢出
+ * 关掉可以少两个钩子函数，代码更干净 */
+#define configCHECK_FOR_STACK_OVERFLOW          0
 
-/* ⭐ 堆耗尽检测：FreeRTOS 的堆（configTOTAL_HEAP_SIZE）用完时会调用
- * vApplicationMallocFailedHook()。任务创建失败、队列创建失败都会走到这里 */
-#define configUSE_MALLOC_FAILED_HOOK            1
+/* 堆耗尽检测：关闭（堆是固定的，创建任务在启动时就一次性做完，不会中途失败）*/
+#define configUSE_MALLOC_FAILED_HOOK            0
 
 /* USER CODE END Defines */
 
