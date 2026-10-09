@@ -82,16 +82,19 @@ static float SlewLimit(float now, float target, float rate, float dt)
 }
 
 /* ---- 读档位 ----
- * SBUS 三位开关的三个值大约：172（下）/ 992（中）/ 1811（上）
- *   上   → 位置模式
- *   下   → 速度模式
- *   中间 → 停机（最安全）*/
+ * ⚠️ 实测值（HT-10A 遥控器，SWA5 = CH5）：
+ *       上拨 = 192     中间 = 992     下拨 = 1792
+ *   ⭐ 注意：上拨是【小值】，下拨是【大值】—— 和直觉相反，别搞反
+ *
+ *   上拨（< 500）  → 位置模式   ← 考核要求
+ *   中间           → 停机（最安全）
+ *   下拨（> 1500） → 速度模式   ← 考核要求 */
 static CtrlMode_t ReadMode(void)
 {
     uint16_t swa = remote.ch[SBUS_CH5_SWA];
 
-    if (swa > CTRL_SWA_POS_MIN)   { return CTRL_MODE_POS;   }
-    if (swa < CTRL_SWA_SPEED_MAX) { return CTRL_MODE_SPEED; }
+    if (swa < CTRL_SWA_POS_MAX)   { return CTRL_MODE_POS;   }
+    if (swa > CTRL_SWA_SPEED_MIN) { return CTRL_MODE_SPEED; }
     return CTRL_MODE_STOP;
 }
 
@@ -240,23 +243,23 @@ int Control_SelfTest(void)
     if (ApplyDeadzone(0.5f)  != 0.5f)  { return 5; }
     if (ApplyDeadzone(-0.5f) != -0.5f) { return 6; }
 
-    /* ⑤ 判档位：SWA = 1811 / 992 / 172 */
-    remote.ch[SBUS_CH5_SWA] = 1811U;
+    /* ⑤ 判档位（用实测值：上 192 / 中 992 / 下 1792）*/
+    remote.ch[SBUS_CH5_SWA] = 192U;       /* 上拨 = 小值 → 位置模式 */
     if (ReadMode() != CTRL_MODE_POS)   { return 7; }
-    remote.ch[SBUS_CH5_SWA] = 992U;
+    remote.ch[SBUS_CH5_SWA] = 992U;       /* 中间 → 停机 */
     if (ReadMode() != CTRL_MODE_STOP)  { return 8; }
-    remote.ch[SBUS_CH5_SWA] = 172U;
+    remote.ch[SBUS_CH5_SWA] = 1792U;      /* 下拨 = 大值 → 速度模式 */
     if (ReadMode() != CTRL_MODE_SPEED) { return 9; }
 
-    /* ⑥ 摇杆推到底 = 满量程 ±90° */
-    v = Remote_ChNorm(1811U) * CTRL_ANGLE_LIMIT_DEG;
+    /* ⑥ 摇杆推到底 = 满量程 ±90°（用实测量程 192 / 1792）*/
+    v = Remote_ChNorm(1792U) * CTRL_ANGLE_LIMIT_DEG;
     if (v < 89.9f || v > 90.1f)   { return 10; }
-    v = Remote_ChNorm(172U) * CTRL_ANGLE_LIMIT_DEG;
+    v = Remote_ChNorm(192U) * CTRL_ANGLE_LIMIT_DEG;
     if (v > -89.9f || v < -90.1f) { return 11; }
 
     /* ⑦ 摇杆推到底 = 满量程 ±½额定转速
      * ⭐ 用宏自己算上下限，这样以后改了 CTRL_SPEED_LIMIT_RPM 不用回来改这里 */
-    v = Remote_ChNorm(1811U) * CTRL_SPEED_LIMIT_RPM;
+    v = Remote_ChNorm(1792U) * CTRL_SPEED_LIMIT_RPM;
     if (v < (CTRL_SPEED_LIMIT_RPM - 1.0f) ||
         v > (CTRL_SPEED_LIMIT_RPM + 1.0f)) { return 12; }
 

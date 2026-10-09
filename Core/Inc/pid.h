@@ -36,18 +36,26 @@
  *   ⚠️ 这些只是"起步的猜测值"，必须上机慢慢整定，不要当成正确答案
  * ==========================================================================*/
 
-/* ---- 速度环（内环）---- */
-#define PID_SPEED_KP        30.0f      /* 比例 */
-#define PID_SPEED_KI        0.5f       /* 积分 */
+/* ---- 速度环（内环）----
+ * ⚠️ ki 的量级说明（很重要，别照着网上随手写的 0.5 抄）：
+ *    积分是这么累加的： integral += ki × 误差 × dt   （每 1ms 一次）
+ *    → 每秒累加量 = ki × 误差
+ *    要顶掉 10 rpm 的静差，积分得攒到 kp × 误差 = 250
+ *    ki = 0.5  →  每秒只攒 5    →  要 50 秒才有反应（等于没有）
+ *    ki = 10   →  每秒攒 100    →  1~2 秒就把静差顶掉  ✓
+ *    经验公式： ki ≈ kp ÷ Ti      （Ti = 积分时间，取 1~3 秒）*/
+#define PID_SPEED_KP        25.0f      /* 比例（上机整定：25）*/
+#define PID_SPEED_KI        10.0f      /* 积分（上机整定：10）*/
 #define PID_SPEED_KD        0.0f       /* 微分（速度环一般不用 D）*/
 #define PID_SPEED_OUT_MAX   16384.0f   /* 输出上限 = 电调电流最大值 */
 #define PID_SPEED_I_MAX     8000.0f    /* 积分限幅（抗饱和）*/
 
 /* ---- 位置环（外环）---- */
-#define PID_ANGLE_KP        8.0f       /* 比例 */
-#define PID_ANGLE_KI        0.0f       /* 积分（先不用，需要消除静差时再加）*/
-#define PID_ANGLE_KD        0.3f       /* 微分 */
-#define PID_ANGLE_OUT_MAX   300.0f     /* 输出上限 = 允许的最大【输出轴 rpm】*/
+#define PID_ANGLE_KP        6.0f       /* 比例（上机整定：6）*/
+#define PID_ANGLE_KI        0.3f       /* 积分（上机整定：0.3，用来消回正时的静差）*/
+#define PID_ANGLE_KD        0.2f       /* 微分（上机整定：0.2）*/
+#define PID_ANGLE_OUT_MAX   200.0f     /* 输出上限 = 允许的最大【输出轴 rpm】
+                                        *   300 → 200：降低接近速度，治超调 */
 #define PID_ANGLE_I_MAX     50.0f      /* 积分限幅 */
 
 
