@@ -130,7 +130,7 @@ Terminal → Run Task...  →  选一个：
 
 **要检查的 6 个文件：**
 ```
-can_motor.c   pid.c   remote.c   control.c   protection.c   debug.c
+can_motor.c   pid.c   remote.c   control.c   safety.c   debug.c
 ```
 
 **⭐ 另外：改了 `TEST.ioc` 之后，还要注意这几项会不会被重置：**

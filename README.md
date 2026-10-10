@@ -58,7 +58,7 @@ J-Scope 实时显示 5 条曲线：目标角度、实际角度、目标转速、
 ```
 RC-EXEM/
 ├─ Core/
-│  ├─ Inc/    can_motor.h  remote.h  pid.h  control.h  protection.h  debug.h
+│  ├─ Inc/    can_motor.h  remote.h  pid.h  control.h  safety.h  debug.h
 │  │          main.h  gpio.h  can.h  usart.h  FreeRTOSConfig.h  ...
 │  └─ Src/    main.c       启动 + 7 个上电自测 + 初始化
 │             freertos.c   4 个任务
@@ -66,8 +66,8 @@ RC-EXEM/
 │             remote.c     SBUS 25 字节解析成 16 个通道
 │             pid.c        PID 算法
 │             control.c    判档位 + 摇杆映射 + 串级 PID 调度   ← 核心
-│             protection.c 保护（4 条判断）
-│             debug.c      给 J-Scope 的 5 个变量
+│             safety.c     ⭐ 安全中心（三层安全 + 看门狗）
+│             debug.c      ⭐ J-Scope 的 5 条曲线 + 5 个安全状态
 ├─ Drivers/      STM32 HAL 库 + CMSIS（CubeMX 生成）
 ├─ Middlewares/  FreeRTOS（CubeMX 生成）
 ├─ MDK-ARM/      Keil 工程 TEST.uvprojx
@@ -99,7 +99,7 @@ RC-EXEM/
 
 | 任务 | 周期 | 优先级 | 职责 |
 |---|---|---|---|
-| `controlTask` | 1 ms | 40（High） | 保护 + 双环 PID + 发 CAN |
+| `controlTask` | 1 ms | 40（High） | 安全中心（含喂狗）+ 双环 PID + 发 CAN |
 | `remoteTask` | 10 ms | 32（AboveNormal） | 读遥控 + 判档位 + 算目标 |
 | `debugTask` | 500 ms | 8（Low） | 绿灯心跳 |
 | `defaultTask` | 1 ms | 24（Normal） | 空任务（CubeMX 模板自带） |
@@ -113,7 +113,7 @@ RC-EXEM/
                                     ↓
                         remoteTask 算目标（s_target_deg / s_stick_rpm）
                                     ↓
-              controlTask：保护 → 位置环 → 速度环 → 电流
+              controlTask：安全中心（喂狗）→ 位置环 → 速度环 → 电流
                                     ↓
                           CAN 控制帧（0x200）→ C620 → M3508
                                     ↓
@@ -131,18 +131,74 @@ RC-EXEM/
 
 **位置环的输出直接当速度环的目标** —— 这就是串级。
 
-### 保护
+### ⭐ 安全中心（三层安全体系）
 
-只做四条"真出事"的判断，命中就断电流：
+**所有**安全逻辑集中在 `safety.c`，别的模块只负责"上报状态"。
 
-| 条件 | 阈值 |
-|---|---|
-| 遥控掉线 | 50 ms 没收到 SBUS 帧 |
-| 电调掉线 | 100 ms 没收到 CAN 反馈 |
-| 电调报错误码 | 手册第 8 字节 ≠ 0 |
-| 电机过温 | ≥ 115 ℃ |
+#### 第一层：通信 / 硬件故障（可恢复 → 只断电流）
+
+| 条件 | 阈值 | 故障位 |
+|---|---|---|
+| 遥控掉线 | 50 ms 没收到 SBUS 帧 | `FAULT_RC_OFFLINE` (bit0) |
+| 电调掉线 | 100 ms 没收到 CAN 反馈 | `FAULT_ESC_OFFLINE` (bit1) |
+| 电调报错误码 | 手册第 8 字节 ≠ 0 | `FAULT_ESC_ERROR` (bit2) |
+| 电机过温 | ≥ 115 ℃ | `FAULT_OVER_TEMP` (bit3) |
+
+**⭐ 故障码用【位掩码】而不是枚举** —— 能同时报多个故障，一眼看出"是遥控和电调一起掉的"还是"只有电调掉"。
 
 **故意不做**降额、堵转检测、角度软限位、故障锁存 —— 这几条会和"保持 ±90° 不抖动"冲突。
+
+#### 第二层：程序跑飞（不可恢复 → 看门狗复位）
+
+```
+HardFault / BusFault / UsageFault / MemManage / NMI
+   → Safety_FaultHandler()
+      ① 从异常栈帧里取出崩溃的 PC，存进【备份寄存器】
+      ② 点亮红灯
+      ③ 故意不喂狗 → 500ms 后看门狗复位 → 系统自动恢复
+```
+
+**⭐ 为什么不用 `NVIC_SystemReset()` 立刻复位？**
+立刻复位快，但你什么线索都没有。交给看门狗咬的话，复位前有 500ms 把现场记下来，
+复位后读 `dbg_safety_fault_pc`，拿这个地址去 `TEST.map` 里查就知道崩在哪个函数。
+
+**⭐ 为什么存备份寄存器而不是普通 RAM？**
+普通 RAM 在复位后被启动代码清零（`.bss` 段），存不住。
+备份寄存器（`RTC->BKP0R~`）靠 VDD/VBAT 供电，**复位不会丢**。
+
+#### 第三层：任务卡死（不可恢复 → 看门狗复位）
+
+```
+三个任务各定期调 Safety_Heartbeat() 上报"我还活着"
+   controlTask  1ms
+   remoteTask   10ms
+   debugTask    10ms（每 50 次才翻一次绿灯，所以绿灯还是 500ms 闪一次）
+
+Safety_Update()（在 controlTask 里，1ms 一次）检查心跳：
+   都在 200ms 内 → 喂狗
+   有一个超时     → 记下"是谁卡了" → 不喂狗 → 500ms 复位
+```
+
+#### ⭐ 喂狗规则（整个设计最关键的地方）
+
+| 情况 | 喂狗吗 | 为什么 |
+|---|---|---|
+| 一切正常 | ✅ 喂 | — |
+| **遥控/电调掉线、过温** | ✅ **照样喂** | 那是**外部故障**，程序本身健康，断电流就能恢复。这时复位反而让车莫名重启 |
+| 任务卡死 | ❌ 不喂 | 程序已经不能干活了，只能靠复位救回来 |
+| 程序跑飞（Fault） | ❌ 不喂 | 同上 |
+
+#### 复位后能看到什么
+
+```
+dbg_safety_last_fault   上次复位前的故障码（0 = 上次是正常复位）
+dbg_safety_fault_pc     上次崩溃的地址 → 去 TEST.map 里查是哪个函数
+dbg_safety_reset        低 8 位 = 复位原因（1 = 看门狗复位）
+                        高 8 位 = 复位次数
+dbg_safety_hb           三个任务的心跳"年龄"（正常都应该是 0~10）
+```
+
+**⭐ 这几个变量在 J-Scope 里也能直接看 —— 这就是"出现问题能集中看到哪里出问题了"。**
 
 ---
 
@@ -199,7 +255,7 @@ RC-EXEM/
 | 速度上限 | `control.h` | 215 rpm |
 | 斜坡限速 | `control.h` | 角度 180°/s，转速 600 rpm/s，电流 1000000/s |
 | 摇杆死区 | `control.h` | 0.03 |
-| 过温阈值 | `protection.h` | 115 ℃ |
+| 过温阈值 | `safety.h` | 115 ℃ |
 | 减速比 / 编码器分辨率 | `can_motor.h` | 19.2032 / 8192 |
 
 ### 7.3 ⚠️ 两个上机才发现、必须记住的坑
@@ -232,9 +288,21 @@ RC-EXEM/
 | CAN 收发（电调 ID=1）| ✅ `motor1.inited = 1` |
 | 位置模式（左摇杆）| ✅ 推到底到 ±90°，到位后稳定在 0.4° 以内，不抖不超调 |
 | 速度模式（右摇杆）| ✅ 正转 / 停止 / 反转平稳，静差 10~15 rpm |
-| 保护：遥控掉线 | ✅ 拔遥控器电池 → `protect_fault = 1`，电机停 |
-| 保护：电调掉线 | ✅ 拔 CAN 线 → `protect_fault = 2`，电机停 |
 | J-Scope 5 条曲线 | ✅ HSS 模式实时显示 |
+| 保护：遥控掉线 | ✅ 拔遥控器电池 → `dbg_safety_fault` = bit0，电机停 |
+| 保护：电调掉线 | ✅ 拔 CAN 线 → `dbg_safety_fault` = bit1，电机停 |
+
+### ⭐ 安全中心（验收通过后新增，待上机验证）
+
+| 项目 | 怎么验 | 预期 |
+|---|---|---|
+| 自测通过 | 上电 | 绿灯 500ms 闪，`dbg_safety_fault = 0` |
+| 任务心跳正常 | J-Scope 看 `dbg_safety_hb` | 三个字节都在 0~10 |
+| 喂狗正常 | 上电后不管它，看 `dbg_safety_reset` | 低 8 位一直是 3（上电复位），说明没被狗咬 |
+| 任务卡死检测 | 在 controlTask 里临时加 `while(1);` | 200ms 后 `dbg_safety_fault` = bit5，500ms 后板子复位 |
+| 看门狗复位 | 复位后看 `dbg_safety_reset` | 低 8 位 = 1（IWDG 复位）|
+| HardFault 记录 | 临时调一个空函数指针 | 红灯常亮 → 复位，`dbg_safety_last_fault` 含 bit4，`dbg_safety_fault_pc` 非 0 |
+| 复位次数累加 | 复位几次 | `dbg_safety_reset` 高 8 位递增 |
 
 ### ⚠️ 上机配置（如果换电脑要重新配）
 
