@@ -86,9 +86,28 @@
             "problemMatcher": []
         },
         {
+            // ⭐ 用完 CubeMX 之后【第一件】必跑的事：给它去掉的 BOM 补回来
+            //    CubeMX 把 .c/.h 存成不带 BOM 的 UTF-8 → Keil 里中文注释全乱码
+            "label": "⑥ 补 BOM（CubeMX 生成后跑）",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/.vscode/fix_bom.ps1"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true,
+                "echo": false
+            },
+            "problemMatcher": []
+        },
+        {
             // ⭐ 用完 CubeMX 重新生成代码之后，跑一下这个
             //    它会检查 6 个自写文件还在不在工程里，缺了自动补回去
-            "label": "⑥ 检查工程文件（CubeMX 重新生成后跑）",
+            "label": "⑦ 检查工程文件（CubeMX 重新生成后跑）",
             "type": "shell",
             "command": "powershell",
             "args": [

@@ -307,3 +307,73 @@ Get-ChildItem 'C:\RM\teach\TEST\Core' -Recurse -Include *.c,*.h | ForEach-Object
     }
 }
 ```
+
+---
+
+# 十、⚠️⚠️ CubeMX 的 GENERATE CODE 会干这些坏事
+
+**2026-10-10 踩过的坑，务必记住。**
+
+## 它改了什么
+
+```
+❌ 去掉所有 .c/.h 的 UTF-8 BOM
+   → Keil 里中文注释全部变成乱码
+
+❌ 删掉 USER CODE 区域【之外】的注释
+   → 我写在 stm32f4xx_it.c 里的大段说明注释被删了
+
+❌ 重写 .uvprojx / .uvoptx
+   → 手动加进工程的文件条目可能丢
+   → Keil 的调试器设置（J-Link、SWD、Reset and Run）可能被重置
+
+✅ 但保护了 USER CODE 区域
+   → 写在 /* USER CODE BEGIN ... */ 和 /* USER CODE END ... */ 之间的代码不会丢
+```
+
+## ⭐ 生成完之后按顺序做这两件事
+
+```
+① VSCode → Terminal → Run Task → 【⑥ 补 BOM】
+      给它去掉的 BOM 补回来
+      
+② VSCode → Terminal → Run Task → 【⑦ 检查工程文件】
+      检查那 6 个自写 .c 文件还在不在工程里，缺了自动补
+      
+③ 回 Keil 检查这几项有没有被重置：
+      □ Debug → Settings → Port 是不是还是 SWD
+      □ Utilities → Settings → Flash Download → ☑ Reset and Run
+      □ C/C++ → Optimization 是不是还是 -O0
+      
+④ 编译验证：Ctrl+Shift+B → 0 Error 0 Warning
+```
+
+## ⭐ 更省事的做法：用 git 看 CubeMX 到底改了什么
+
+```
+VSCode → 左侧【源代码管理】图标（Ctrl+Shift+G）
+   → 会列出被改的文件
+   → 点每个文件看红绿对比
+   
+⭐ 一眼就能看出 CubeMX 动了什么
+```
+
+## ⭐ 如果 CubeMX 这次【没有产生有用的新东西】
+
+```
+直接全部恢复：
+   git checkout -- .
+
+（这次就是这种情况 —— CubeMX 只是把文件重写了一遍，
+  丢了 BOM 和注释，什么都没带来）
+```
+
+## ⭐ 判断标准
+
+```
+CubeMX 生成的结果【有价值】 → 你确实改了引脚/外设/时钟配置
+   → 跑任务⑥⑦，然后回 Keil 补设置
+
+CubeMX 生成的结果【没价值】 → 你只是打开看看、点错了 GENERATE
+   → git checkout -- .  全部恢复
+```
