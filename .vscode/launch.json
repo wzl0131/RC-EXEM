@@ -60,6 +60,30 @@
                 "-speed", "1000"
             ],
             "showDevDebugOutput": "none"
+        },
+        {
+            // ================================================================
+            //  ⚠️ 备用配置：如果你手上只有 ST-Link
+            //
+            //  用之前必须先装 ST-Link 的 GDB Server，二选一：
+            //    ① STM32CubeProgrammer（里面带 ST-LINK_gdbserver.exe）
+            //    ② stlink-tools（提供 st-util.exe）
+            //
+            //  装完把下面的 "serverpath" 指向那个 exe
+            //
+            //  ⚠️⚠️ 但注意：J-Scope 【不支持 ST-Link】！
+            //     用 ST-Link 就录不了实时曲线，只能用 Keil 的 Watch 看数值
+            // ================================================================
+            "name": "ST-Link 调试（要先装 GDB Server）",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "stlink",
+            "device": "STM32F427II",
+            "interface": "swd",
+            "executable": "${workspaceFolder}/MDK-ARM/TEST/TEST.axf",
+            "svdFile": "${workspaceFolder}/.vscode/STM32F427.svd",
+            "runToEntryPoint": "main",
+            "showDevDebugOutput": "none"
         }
     ]
 }
