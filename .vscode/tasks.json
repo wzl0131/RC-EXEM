@@ -84,6 +84,26 @@
             ],
             "presentation": { "reveal": "silent" },
             "problemMatcher": []
+        },
+        {
+            // ⭐ 用完 CubeMX 重新生成代码之后，跑一下这个
+            //    它会检查 6 个自写文件还在不在工程里，缺了自动补回去
+            "label": "⑥ 检查工程文件（CubeMX 重新生成后跑）",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/.vscode/check_project.ps1",
+                "-Fix"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true,
+                "echo": false
+            },
+            "problemMatcher": []
         }
     ]
 }

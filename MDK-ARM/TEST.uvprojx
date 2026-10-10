@@ -392,16 +392,6 @@
           <GroupName>Application/User/Core</GroupName>
           <Files>
             <File>
-              <FileName>can_motor.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/can_motor.c</FilePath>
-            </File>
-            <File>
-              <FileName>pid.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/pid.c</FilePath>
-            </File>
-            <File>
               <FileName>remote.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/remote.c</FilePath>
@@ -416,12 +406,22 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/debug.c</FilePath>
             </File>
+                        <File>
+              <FileName>can_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/can_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/pid.c</FilePath>
+            </File>
             <File>
               <FileName>protection.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/protection.c</FilePath>
             </File>
-            <File>
+<File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>../Core/Src/main.c</FilePath>

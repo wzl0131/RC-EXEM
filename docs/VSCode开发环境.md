@@ -100,14 +100,45 @@ Terminal → Run Task...  →  选一个：
 录曲线时：  Keil / VSCode 都停掉 → 开 J-Scope
 ```
 
-## ④ 改了 `TEST.ioc`（引脚/外设配置）之后
+## ④ ⭐ 用了 CubeMX 重新生成代码之后 —— 跑一下任务⑥
 
 ```
 用 CubeMX 重新生成代码 → 会重写 MDK-ARM\TEST.uvprojx
-→ ⚠️ 手动加进工程的 .c 文件条目可能会丢
+→ ⚠️ 手动加进工程的 6 个 .c 文件条目【可能会丢】
+   （我们的 6 个文件排在 main.c 之前，说明是手动插进去的）
 
-生成完回 Keil 检查一遍：Project 窗口里那 6 个文件还在不在
-   can_motor.c  pid.c  remote.c  control.c  protection.c  debug.c
+丢了之后的症状很坑：
+   Keil 不会报"找不到文件"，而是【直接不编译那些文件】
+   → 链接时冒出一堆 undefined reference to 'C620_ParseRx' 之类的错
+   → 你会以为是代码写错了
+
+⭐ 所以：用完 CubeMX → 立刻跑一下 VSCode 任务⑥
+   Terminal → Run Task... → 【⑥ 检查工程文件（CubeMX 重新生成后跑）】
+
+   它会：
+     · 检查 6 个文件还在不在
+     · 缺了【自动补回去】（改之前先备份成 TEST.uvprojx.bak）
+     · 补完回 Keil 重新打开工程就能看到
+```
+
+**⭐ 也可以用命令行跑：**
+
+```powershell
+.\.vscode\check_project.ps1          # 只检查，不改（安全）
+.\.vscode\check_project.ps1 -Fix     # 缺了自动补回去（会先备份）
+```
+
+**要检查的 6 个文件：**
+```
+can_motor.c   pid.c   remote.c   control.c   protection.c   debug.c
+```
+
+**⭐ 另外：改了 `TEST.ioc` 之后，还要注意这几项会不会被重置：**
+```
+□ Debug 选项卡里 Port 是不是还是 SWD
+□ Utilities → Settings → Flash Download 里 Reset and Run 还在不在
+□ IncludePath 和 Define（USE_HAL_DRIVER, STM32F427xx）
+□ C/C++ → Optimization 是不是还是 -O0
 ```
 
 ---
