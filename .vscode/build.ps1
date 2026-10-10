@@ -55,14 +55,25 @@ if (Test-Path $log) {
 }
 
 # ---- UV4 退出码：0 = 无错误无警告；1 = 有警告；2 及以上 = 有错误 ----
+# ⚠️ flash 模式下失败通常是【下载】失败（没接板子 / J-Link 被占），不是编译错
+$what = if ($Mode -eq 'flash') { '编译+下载' } else { '编译' }
+
 if ($code -eq 0) {
-    Write-Host "==> [OK] 编译成功：0 Error, 0 Warning" -ForegroundColor Green
+    Write-Host "==> [OK] $what 成功：0 Error, 0 Warning" -ForegroundColor Green
 }
 elseif ($code -eq 1) {
-    Write-Host "==> [WARN] 编译通过，但有警告 —— 看上面的 warning 行" -ForegroundColor Yellow
+    Write-Host "==> [WARN] $what 通过，但有警告 —— 看上面的 warning 行" -ForegroundColor Yellow
 }
 else {
-    Write-Host "==> [FAIL] 编译失败（UV4 退出码 $code）" -ForegroundColor Red
+    Write-Host "==> [FAIL] $what 失败（UV4 退出码 $code）" -ForegroundColor Red
+
+    if ($Mode -eq 'flash') {
+        Write-Host ""
+        Write-Host "    flash 模式失败常见原因：" -ForegroundColor Yellow
+        Write-Host "      · 没接 J-Link / 板子没上电" -ForegroundColor Yellow
+        Write-Host "      · Keil 或 J-Scope 还占着 J-Link  -> 先关掉它们" -ForegroundColor Yellow
+        Write-Host "      · SWD 线没接好" -ForegroundColor Yellow
+    }
 }
 
 exit $code
