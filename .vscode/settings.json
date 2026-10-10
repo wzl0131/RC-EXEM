@@ -1,0 +1,60 @@
+{
+    // ⭐⭐⭐ 最重要的一条：保存成 UTF-8【带 BOM】
+    // Keil 编辑器靠 BOM 识别 UTF-8，没有 BOM 时它会按 GBK 解析
+    // → 中文注释全变乱码。用 VSCode 改完文件后，这个设置能保证 Keil 里不乱码。
+    "files.encoding": "utf8bom",
+
+    // 换行符：Windows
+    "files.eol": "\r\n",
+
+    // 保存时去掉行尾空格（可选，保持代码整洁）
+    "files.trimTrailingWhitespace": true,
+    // 但保存时【不要】自动格式化 —— 会影响 Keil 里的对齐排版
+    "editor.formatOnSave": false,
+
+    // 文件关联：让 VSCode 用正确的语法高亮
+    "files.associations": {
+        "*.h": "c",
+        "*.ioc": "ini",
+        "*.uvprojx": "xml",
+        "*.uvoptx": "xml",
+        "*.s": "arm",
+        "*.ld": "linkerscript"
+    },
+
+    // 隐藏编译产物（不然侧边栏一堆文件）
+    "files.exclude": {
+        "**/MDK-ARM/TEST": true,
+        "**/MDK-ARM/DebugConfig": true,
+        "**/MDK-ARM/Objects": true,
+        "**/MDK-ARM/Listings": true,
+        "**/.git": true,
+        "**/*.bak": true
+    },
+
+    // 搜索时跳过大文件和第三方库
+    "search.exclude": {
+        "**/MDK-ARM/TEST": true,
+        "**/Drivers/CMSIS": true,
+        "**/Drivers/STM32F4xx_HAL_Driver": true,
+        "**/Middlewares": true
+    },
+
+    // C/C++ 插件的默认设置
+    "C_Cpp.default.cStandard": "c99",
+    "C_Cpp.default.cppStandard": "c++17",
+    "C_Cpp.default.intelliSenseMode": "gcc-arm",
+    "C_Cpp.errorSquiggles": "enabled",
+    "C_Cpp.autocompleteAddParentheses": true,
+
+    // 终端用 PowerShell
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+
+    // 显示空白字符（对齐时有用，可关）
+    "editor.renderWhitespace": "none",
+
+    // 中文界面提示：装 Chinese 语言包后生效
+    "editor.fontSize": 14,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+}

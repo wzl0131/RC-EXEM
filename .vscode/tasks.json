@@ -1,0 +1,89 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "① 编译 (Build)",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/.vscode/build.ps1",
+                "-Mode", "build"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true,
+                "echo": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "② 全部重新编译 (Rebuild)",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/.vscode/build.ps1",
+                "-Mode", "rebuild"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true,
+                "echo": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "③ 编译并下载到板子 (Flash)",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "${workspaceFolder}/.vscode/build.ps1",
+                "-Mode", "flash"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true,
+                "echo": false
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "④ 打开 Keil（改工程配置用）",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-Command",
+                "Start-Process 'C:\\Keil_v5\\UV4\\UV4.exe' -ArgumentList '${workspaceFolder}\\MDK-ARM\\TEST.uvprojx'"
+            ],
+            "presentation": { "reveal": "silent" },
+            "problemMatcher": []
+        },
+        {
+            "label": "⑤ 打开 CubeMX（改硬件配置用）",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-Command",
+                "Start-Process '${workspaceFolder}\\TEST.ioc'"
+            ],
+            "presentation": { "reveal": "silent" },
+            "problemMatcher": []
+        }
+    ]
+}

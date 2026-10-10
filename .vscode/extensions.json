@@ -1,0 +1,19 @@
+{
+    // 打开这个工程时，VSCode 会提示你装这些插件
+    "recommendations": [
+        // ⭐ 必需：C/C++ 语言支持（代码补全、跳转、错误提示）
+        "ms-vscode.cpptools",
+
+        // ⭐ 推荐：Cortex-M 调试（代替 Keil 的调试器）
+        "marus25.cortex-debug",
+
+        // 可选：中文界面
+        "ms-ceintl.vscode-language-pack-zh-hans",
+
+        // 可选：Hex / 二进制文件查看
+        "ms-vscode.hexeditor",
+
+        // 可选：Markdown 预览增强（写说明文档用）
+        "yzhang.markdown-all-in-one"
+    ]
+}

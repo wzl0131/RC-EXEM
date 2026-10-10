@@ -25,7 +25,12 @@ MDK-ARM/*.uvguix.*
 MDK-ARM/*.uvopt.bak
 
 # ============ IDE ============
-.vscode/
+# ⭐ VSCode 的配置文件要提交（换台电脑也能直接用同一套环境）
+#    只忽略缓存和日志，不忽略配置本身
+.vscode/ipch/
+.vscode/*.log
+.vscode/.browse.*
+MDK-ARM/build.log
 .idea/
 
 # ============ 考核用不到的库（省 12MB）============
