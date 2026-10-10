@@ -35,7 +35,7 @@ $ourFiles = @(
     @{ n = 'remote.c';     p = '../Core/Src/remote.c'     },
     @{ n = 'control.c';    p = '../Core/Src/control.c'    },
     @{ n = 'debug.c';      p = '../Core/Src/debug.c'      },
-    @{ n = 'protection.c'; p = '../Core/Src/protection.c' }
+    @{ n = 'safety.c';     p = '../Core/Src/safety.c'     }
 )
 
 $text = [System.IO.File]::ReadAllText($proj, [System.Text.Encoding]::UTF8)

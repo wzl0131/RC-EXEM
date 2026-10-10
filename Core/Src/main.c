@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+﻿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -30,7 +30,7 @@
 #include "pid.h"
 #include "remote.h"
 #include "control.h"
-#include "protection.h"
+#include "safety.h"
 #include "debug.h"
 /* USER CODE END Includes */
 
@@ -64,6 +64,41 @@ void MX_FREERTOS_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/**
+  * @brief  自测失败后的死循环：闪红灯 + 【喂狗】
+  * @param  blink_ms 闪烁半周期（毫秒）；传 0 = 常亮
+  *
+  * ⭐ 为什么这里必须喂狗？
+  *    CubeMX 把 MX_IWDG_Init() 放在自测【之前】，看门狗 0.5 秒就超时。
+  *    自测失败会进死循环 —— 如果不喂狗，板子会每 0.5 秒复位一次，
+  *    红灯暗号根本闪不出来，人看不到是哪个自测挂了。
+  *
+  * ⭐ 设计原则：
+  *    自测失败属于【开发阶段的错】，要能停下来让人看；
+  *    运行期的卡死才交给看门狗自动复位（那是 Safety_Update 的事）。
+  */
+static void SelfTest_Hang(uint32_t blink_ms)
+{
+  if (blink_ms == 0U)
+  {
+    /* 常亮 */
+    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
+    for (;;)
+    {
+      HAL_IWDG_Refresh(&hiwdg);      /* ⭐ 喂狗，保持常亮不被打断 */
+      HAL_Delay(100);
+    }
+  }
+
+  /* 闪烁 */
+  for (;;)
+  {
+    HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin);
+    HAL_IWDG_Refresh(&hiwdg);        /* ⭐ 喂狗，保持闪烁不被打断 */
+    HAL_Delay(blink_ms);
+  }
+}
 
 /* USER CODE END 0 */
 
@@ -110,41 +145,48 @@ int main(void)
    *    闪 500 ms   = 过零累计错了
    *    闪 100 ms   = PID 数学错了
    *    闪 50 ms    = SBUS 解析错了
+   *    闪 200 ms   = 档位/摇杆映射错了
+   *    闪 300 ms   = 安全中心错了
+   *    闪 400 ms   = J-Scope 数据搬运错了
+   *
+   * ⚠️ 每个死循环里都要【喂狗】—— 见 SelfTest_Hang() 的说明
    * ==========================================================================*/
   if (C620_SelfTest() != 0)
   {
-    HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
-    for (;;) { }                                     /* 红灯常亮 */
+    SelfTest_Hang(0U);              /* 常亮 */
   }
   if (AngleAccumSelfTest() != 0)
   {
-    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(500); }
+    SelfTest_Hang(500U);
   }
   if (Pid_SelfTest() != 0)
   {
-    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(100); }
+    SelfTest_Hang(100U);
   }
   if (Remote_SelfTest() != 0)
   {
-    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(50); }
+    SelfTest_Hang(50U);
   }
   if (Control_SelfTest() != 0)      /* 档位判断 / 摇杆映射 / 斜坡限速 */
   {
-    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(200); }
+    SelfTest_Hang(200U);
   }
-  if (Protection_SelfTest() != 0)   /* 遥控/电调掉线、报错、过温 */
+  if (Safety_SelfTest() != 0)       /* 遥控/电调掉线、报错、过温、任务心跳 */
   {
-    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(300); }
+    SelfTest_Hang(300U);
   }
   if (Debug_SelfTest() != 0)        /* J-Scope 用的数据搬运 */
   {
-    for (;;) { HAL_GPIO_TogglePin(LED_RED_GPIO_Port, LED_RED_Pin); HAL_Delay(400); }
+    SelfTest_Hang(400U);
   }
 
   /* ==========================================================================
-   * ② 自测全部通过 → 初始化控制逻辑（两路 PID + 保护状态）
+   * ② 自测全部通过 → 初始化控制逻辑（安全中心 + 两路 PID）
    *    必须放在自测【之后】（自测会改全局变量），
    *    也必须放在启动接收【之前】（两个任务都要用 PID）
+   *
+   *    ⭐ Control_Init() 内部会调 Safety_Init()：
+   *       读复位原因、读上次的故障记录、复位任务心跳
    * ==========================================================================*/
   Control_Init();
 

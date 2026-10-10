@@ -417,9 +417,9 @@
               <FilePath>../Core/Src/pid.c</FilePath>
             </File>
             <File>
-              <FileName>protection.c</FileName>
+              <FileName>safety.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../Core/Src/protection.c</FilePath>
+              <FilePath>../Core/Src/safety.c</FilePath>
             </File>
             <File>
               <FileName>main.c</FileName>

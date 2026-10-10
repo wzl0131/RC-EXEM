@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+﻿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * File Name          : freertos.c
@@ -29,6 +29,7 @@
 #include "pid.h"
 #include "remote.h"
 #include "control.h"
+#include "safety.h"
 #include "debug.h"
 /* USER CODE END Includes */
 
@@ -176,12 +177,17 @@ void startRemoteTask(void *argument)
    *    每 10 ms 跑一次：
    *      读 remote.ch[] → 判档位（SWA5）→ 算摇杆目标 → 存到全局
    *    （SBUS 的字节接收在 USART1 中断里完成，这里只做"解读"）
+   *
+   *    ⭐ 每次都上报心跳 → 这个任务卡死的话，安全中心会发现，
+   *       然后停止喂狗让看门狗复位（见 safety.c）
    * ========================================================================== */
   tick = osKernelGetTickCount();
   for(;;)
   {
     tick += 10U;                 /* 10 ms → 100 Hz，够跟遥控器（约 14ms 一帧）*/
     osDelayUntil(tick);
+
+    Safety_Heartbeat(SAFETY_TASK_REMOTE);   /* ⭐ "我还活着" */
 
     Control_RemoteUpdate();      /* 读遥控 + 判档位 + 算目标 */
   }
@@ -212,8 +218,17 @@ void StartControlTask(void *argument)
     tick += 1U;
     osDelayUntil(tick);
 
+    /* ⭐ 先上报心跳，再干活 —— 顺序不能反！
+     *   因为 Control_Update() 里面会调 Safety_Update()，
+     *   Safety_Update() 要检查"这个任务的心跳新不新鲜"。
+     *   如果反了，它检查到的就是【上一周期】的心跳。 */
+    Safety_Heartbeat(SAFETY_TASK_CONTROL);
+
     /* 所有决策逻辑都在 Control_Update() 里：
-     *   读档位 → 保护 → 算目标 → 位置环 → 速度环 → 发 CAN */
+     *   读档位 → 安全中心 → 算目标 → 位置环 → 速度环 → 发 CAN
+     *
+     * ⭐ 安全中心（Safety_Update）在里面，它负责喂狗。
+     *    所以：这个任务卡住 → 不喂狗 → 500ms 后看门狗复位 */
     Control_Update();
 
     /* ⭐ 把这一周期的数据记进 debug 结构体，给 J-Scope 看
@@ -234,13 +249,32 @@ void StartControlTask(void *argument)
 void StartDebugTask(void *argument)
 {
   /* USER CODE BEGIN StartDebugTask */
-  /* 心跳：绿灯每 500 ms 翻转一次，表示系统在跑
-   * 注意：六个上电自测已经移到 main.c 的 USER CODE 2 里，
-   *       并且在启动 CAN/串口接收【之前】执行 */
+  uint32_t cnt = 0U;
+
+  /* ==========================================================================
+   * ⭐ debugTask —— 绿灯心跳 + 任务存活上报
+   *
+   *   ⚠️ 为什么要每 10ms 跑一次，而不是直接用 osDelay(500)？
+   *      看门狗超时是 500ms，而这个任务原来也是 500ms 才跑一次
+   *      → 安全中心检查"它的心跳超时（200ms）"时会一直判定它卡死
+   *      → 结果就是无限复位
+   *
+   *   ⭐ 解法：每 10ms 跑一次并上报心跳，
+   *          每 50 次（= 500ms）才翻转一次绿灯
+   *          → 心跳够勤，绿灯还是 500ms 闪一次 ✓
+   * ========================================================================== */
   for(;;)
   {
-    HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
-    osDelay(500);
+    Safety_Heartbeat(SAFETY_TASK_DEBUG);    /* ⭐ "我还活着" */
+
+    cnt++;
+    if (cnt >= 50U)                          /* 50 × 10ms = 500ms */
+    {
+      cnt = 0U;
+      HAL_GPIO_TogglePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin);
+    }
+
+    osDelay(10U);                            /* ⭐ 10ms 一次（原来是 500）*/
   }
   /* USER CODE END StartDebugTask */
 }

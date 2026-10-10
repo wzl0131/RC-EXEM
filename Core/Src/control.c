@@ -16,7 +16,7 @@
 #include "control.h"
 #include "can_motor.h"
 #include "pid.h"
-#include "protection.h"
+#include "safety.h"
 
 
 /* ============================================================================
@@ -35,7 +35,7 @@ static          float      s_last_current = 0.0f;           /* 上一周期发�
  * ==========================================================================*/
 void Control_Init(void)
 {
-    Protection_Init();      /* 清空保护状态 */
+    Safety_Init();          /* 初始化安全中心（读复位原因 + 读上次故障记录）*/
 
     Pid_Init(&pid_speed, PID_SPEED_KP, PID_SPEED_KI, PID_SPEED_KD,
              PID_SPEED_OUT_MAX, PID_SPEED_I_MAX);
@@ -162,9 +162,12 @@ void Control_Update(void)
     float       target_rpm;
     float       current;
 
-    /* ==================== 1. 保护 ====================
-     * 返回 0 → 有故障，必须立刻断电流（不能缓降）*/
-    limit = Protection_Update();
+    /* ==================== 1. 安全中心 ====================
+     * ⭐ 每个控制周期（1ms）调一次，它做三件事：
+     *    ① 收集所有故障（遥控/电调/过温/任务卡死）
+     *    ② 决定【喂狗还是让狗咬】
+     *    ③ 返回 0 = 有故障必须立刻断电流；返回 16384 = 正常 */
+    limit = Safety_Update();
 
     if (limit <= 0.0f)
     {
