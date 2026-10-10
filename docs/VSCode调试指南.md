@@ -89,66 +89,32 @@ Keil 的 F9（断点）   →  在行号左边点一下（或按 F9）
 
 ---
 
-# 三、底部面板（⭐ 这些是 Keil 没有或很弱的）
+# 三、⭐ 三个面板到底在哪（查过插件源码，确定的）
 
-**调试时，底部会出现一排标签页：**
+| 面板 | 谁提供的扩展 | 位置 |
+|---|---|---|
+| **Cortex Live Watch** | `marus25.cortex-debug` | ⭐ **左侧栏**（RUN AND DEBUG 视图里）|
+| **XPeripherals** | `mcu-debug.peripheral-viewer` | **底部面板**（和 TERMINAL 一排）|
+| **RTOS Views** | `mcu-debug.rtos-views` | **底部面板** |
 
-## 1. CORTEX REGISTERS —— 核心寄存器
-
+**怎么快速找到某个面板：**
 ```
-R0 ~ R15、xPSR、MSP/PSP、以及各种 fault 状态位
-
-⭐ 对标 Keil 的 Registers 窗口
-⭐ 而且分组更清楚（Core / Banked / System / Internal / FPU）
-```
-
-## 2. XPERIPHERALS —— 外设寄存器（⭐ 需要 SVD 文件）
-
-**⭐⭐ 这是最有用的一个 —— 对标 Keil 的 Peripherals 窗口，但要强得多。**
-
-```
-左边选外设（GPIOA / USART1 / CAN1 / TIM1 / RCC ...）
-右边显示该外设的所有寄存器，按【位】展开：
-
-   GPIOF
-     MODER
-       MODER14  [01]  ← 输出模式
-     ODR
-       ODR14    [0]   ← 低电平（绿灯点亮）
-     IDR
-       IDR14    [1]   ← 读到的电平
+左侧栏     → Ctrl + Shift + D   （RUN AND DEBUG）
+底部面板   → Ctrl + J           （切换面板显示/隐藏）
 ```
 
-**⭐ 用它来验证引脚配置特别方便：**
-```
-想看 LED_GREEN (PF14) 有没有在翻转：
-   → GPIOF → ODR → ODR14
-   → 在 XPERIPHERALS 面板里能看到这一位的值
-   ⭐ 不过刷新要暂停程序（想看实时变化用 CORTEX LIVE WATCH）
-```
+---
 
-**⚠️ 这个面板必须有 SVD 文件才会出现**（我们已经放了 `STM32F427.svd`）
+## 1. ⭐⭐ CORTEX LIVE WATCH（左侧栏）—— 实时监视，不停止程序
 
-## 4. CORTEX LIVE WATCH —— ⭐⭐ 实时监视（不停止程序！）
-
-> ⚠️ **它在【左侧栏】的 RUN AND DEBUG 视图里，不是底部标签页！**
-> （插件源码里是挂在 `"debug"` 容器下的，条件是 `debugType == cortex-debug`）
-
-**⭐ 这是 Cortex-Debug 的杀手功能：**
+> ⚠️ **在【左侧栏】，不是底部！**
+> （插件源码里挂在 `"debug"` 容器下，条件 `debugType == cortex-debug`）
 
 ```
-把变量加到这里 → 程序【继续跑】的情况下，变量值会周期刷新
-
-⭐ 相当于"简化版的 J-Scope"，不用暂停程序就能看实时值
-⚠️ 但它不能画曲线（画曲线还是用 J-Scope）
-```
-
-**怎么找到它：**
-```
-① 先按 F5 开始调试（不调试它不会出现）
-② 左边栏 → Ctrl+Shift+D 打开 RUN AND DEBUG
+① 先按 F5 开始调试（不调试它不出现）
+② Ctrl+Shift+D 打开 RUN AND DEBUG
 ③ 往下滚 —— 在 VARIABLES / WATCH / CALL STACK / BREAKPOINTS
-   【下面】就是 【CORTEX LIVE WATCH】
+   【下面】就是 CORTEX LIVE WATCH
 ```
 
 **怎么加变量：**
@@ -164,7 +130,71 @@ R0 ~ R15、xPSR、MSP/PSP、以及各种 fault 状态位
 | **WATCH** | 只在程序**暂停**时刷新 |
 | **CORTEX LIVE WATCH** | ⭐ **程序跑着也能刷新** |
 
-## 5. Memory / Disassembly（底部面板）
+**⭐ 相当于"简化版的 J-Scope"，但画不了曲线（画曲线还是用 J-Scope）。**
+
+---
+
+## 2. XPERIPHERALS（底部面板）—— 看外设寄存器（⭐ 需要 SVD 文件）
+
+> ⚠️ 这个面板是**另一个扩展** `mcu-debug.peripheral-viewer` 提供的，
+> 不是 Cortex-Debug 自带的（如果没装就看不到）
+
+```
+① 调试状态下 → 看窗口底部那一排标签
+     TERMINAL | OUTPUT | PROBLEMS | ... | XPERIPHERALS
+② 点 【XPERIPHERALS】
+③ 左边选外设（GPIOF / USART1 / CAN1 / TIM1 / RCC ...）
+   右边显示该外设所有寄存器，按【位】展开
+```
+
+**看到的效果：**
+```
+GPIOF
+  MODER
+    MODER14   [01]    ← PF14 是输出模式 ✓
+  ODR
+    ODR14     [0]     ← 低电平（绿灯亮）
+  IDR
+    IDR14     [1]     ← 读到的实际电平
+```
+
+**⚠️ 如果底部没有这个标签：**
+```
+□ 确认在调试状态（状态栏是橙色的）
+□ 确认 .vscode/STM32F427.svd 在
+□ 确认 launch.json 里有 "svdFile" 这一行
+□ 确认装了 mcu-debug.peripheral-viewer
+```
+
+---
+
+## 3. ⭐ RTOS Views（底部面板）—— 看 FreeRTOS 的任务！
+
+**⭐ 这个对你特别有用 —— 能直接看到每个任务的栈用了多少：**
+
+```
+底部面板 → 【RTOS Views】
+
+   控制任务 controlTask   Running   优先级 40   栈 320/1024 字节
+   遥控任务 remoteTask    Blocked   优先级 32   栈 256/1024 字节
+   心跳任务 debugTask     Blocked   优先级 8    栈 180/1024 字节
+```
+
+**⭐ 用它来验证栈够不够：**
+```
+栈用到 80% 以上 → 该把 stack_size 调大了 ⚠️
+栈用得很低      → 说明当前的栈大小是够的 ✓
+```
+
+**面试时如果被问"你怎么确定任务栈够用"，答：**
+```
+"我上机时用 VSCode 的 RTOS Views 看了每个任务的实际栈使用量，
+ 最高的大概用了三分之一，所以 stack_size 定成 1024 是够的。"
+```
+
+---
+
+## 4. Memory / Disassembly
 
 ```
 Memory      —— 看任意地址的内存（对标 Keil 的 Memory 窗口）
