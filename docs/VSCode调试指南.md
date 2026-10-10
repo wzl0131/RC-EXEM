@@ -129,30 +129,48 @@ R0 ~ R15、xPSR、MSP/PSP、以及各种 fault 状态位
 
 **⚠️ 这个面板必须有 SVD 文件才会出现**（我们已经放了 `STM32F427.svd`）
 
-## 3. CORTEX LIVE WATCH —— ⭐⭐ 实时监视（不停止程序！）
+## 4. CORTEX LIVE WATCH —— ⭐⭐ 实时监视（不停止程序！）
 
-**这是 Cortex-Debug 的杀手功能：**
+> ⚠️ **它在【左侧栏】的 RUN AND DEBUG 视图里，不是底部标签页！**
+> （插件源码里是挂在 `"debug"` 容器下的，条件是 `debugType == cortex-debug`）
+
+**⭐ 这是 Cortex-Debug 的杀手功能：**
 
 ```
 把变量加到这里 → 程序【继续跑】的情况下，变量值会周期刷新
 
-⭐ 对标 J-Scope 的功能，但直接在 VSCode 里，不用切软件
-⚠️ 但它是"读内存"，不能画曲线（画曲线还是用 J-Scope）
+⭐ 相当于"简化版的 J-Scope"，不用暂停程序就能看实时值
+⚠️ 但它不能画曲线（画曲线还是用 J-Scope）
 ```
 
-**用法：**
+**怎么找到它：**
 ```
-在 CORTEX LIVE WATCH 面板点 + → 输入变量名
-→ 按 F5 让程序跑起来
-→ 就能看到值在实时变
+① 先按 F5 开始调试（不调试它不会出现）
+② 左边栏 → Ctrl+Shift+D 打开 RUN AND DEBUG
+③ 往下滚 —— 在 VARIABLES / WATCH / CALL STACK / BREAKPOINTS
+   【下面】就是 【CORTEX LIVE WATCH】
 ```
 
-## 4. Memory / Disassembly
+**怎么加变量：**
+```
+方法 1：那个折叠区右上角点 【+】→ 输入表达式 → 回车
+方法 2：⭐ 更方便 —— 在 VARIABLES 里右键变量 → 【Add to Live Watch】
+```
+
+**和 WATCH 的区别：**
+
+| | 刷新时机 |
+|---|---|
+| **WATCH** | 只在程序**暂停**时刷新 |
+| **CORTEX LIVE WATCH** | ⭐ **程序跑着也能刷新** |
+
+## 5. Memory / Disassembly（底部面板）
 
 ```
 Memory      —— 看任意地址的内存（对标 Keil 的 Memory 窗口）
+               右键变量 → View Memory
 Disassembly —— 反汇编（右键代码 → Open Disassembly View）
-             看 HardFault 卡在哪、看编译出来的汇编很有用
+               看 HardFault 卡在哪、看编译出来的汇编很有用
 ```
 
 ---
