@@ -1,31 +1,33 @@
 {
     // ========================================================================
-    //  调试配置 —— 需要装 Cortex-Debug 插件
-    //  插件 ID: marus25.cortex-debug
+    //  调试配置 —— 需要装 Cortex-Debug 插件（marus25.cortex-debug）
     //
-    //  ⚠️ 注意：这个调试器和 Keil 的调试【不能同时用】
+    //  ⚠️ VSCode 调试 / Keil 调试 / J-Scope 三者【不能同时用】
     //     （都要独占 J-Link）
-    //     用 VSCode 调试前，先在 Keil 里 Stop Debugging
+    //     用 VSCode 调试前，先在 Keil / J-Scope 里停掉
     // ========================================================================
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "J-Link 调试（Cortex-Debug）",
+            "name": "J-Link 调试（先编译）",
             "type": "cortex-debug",
             "request": "launch",
             "servertype": "jlink",
 
-            // 芯片型号（和 J-Scope 里填的一样）
+            // 芯片型号（和 J-Scope / Keil 里填的一致）
             "device": "STM32F427II",
             "interface": "swd",
 
             // 要调试的固件（Keil 编译出来的 .axf）
             "executable": "${workspaceFolder}/MDK-ARM/TEST/TEST.axf",
 
+            // ⭐ SVD 文件 —— 有了它才能看外设寄存器（Peripherals 面板）
+            "svdFile": "${workspaceFolder}/.vscode/STM32F427.svd",
+
             // 启动前先编译（对应 tasks.json 里的"① 编译"）
             "preLaunchTask": "① 编译 (Build)",
 
-            // 停在 main 函数
+            // 停在 main 函数（想直接跑就把这行删掉）
             "runToEntryPoint": "main",
 
             // J-Link 速度（低一点更稳，尤其用杜邦线接的时候）
@@ -33,10 +35,9 @@
                 "-speed", "1000"
             ],
 
-            // SWO / ITM 的时钟（用不到可以不管）
-            "swoConfig": {
-                "enabled": false
-            }
+            // 调试器自己的日志：none / brief / full
+            // 连不上目标的时候改成 "full" 能看到详细信息
+            "showDevDebugOutput": "none"
         },
         {
             "name": "J-Link 调试（不重新编译）",
@@ -46,10 +47,12 @@
             "device": "STM32F427II",
             "interface": "swd",
             "executable": "${workspaceFolder}/MDK-ARM/TEST/TEST.axf",
+            "svdFile": "${workspaceFolder}/.vscode/STM32F427.svd",
             "runToEntryPoint": "main",
             "serverArgs": [
                 "-speed", "1000"
-            ]
+            ],
+            "showDevDebugOutput": "none"
         }
     ]
 }
