@@ -3,6 +3,23 @@
     "configurations": [
         {
             "name": "STM32F427 (Keil AC6)",
+
+            // ⭐ 关键：指向真实的编译器
+            //    微软 C/C++ 插件会去问这个编译器：
+            //      · 你的头文件搜索路径是什么
+            //      · 你预定义了哪些宏（__GNUC__ / __ARMCC_VERSION / __ARM_ARCH_7EM__ ...）
+            //    不填的话插件找不到 stdint.h / stddef.h 这些标准库头文件，
+            //    整个工程会一片红波浪线
+            "compilerPath": "C:/Keil_v5/ARM/ARMCLANG/bin/armclang.exe",
+
+            // 告诉编译器目标芯片是什么（不然它按默认 target 报宏）
+            "compilerArgs": [
+                "--target=arm-arm-none-eabi",
+                "-mcpu=cortex-m4",
+                "-mfpu=fpv4-sp-d16",
+                "-mfloat-abi=hard"
+            ],
+
             "includePath": [
                 "${workspaceFolder}/Core/Inc",
                 "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
@@ -11,23 +28,30 @@
                 "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2",
                 "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F",
                 "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
-                "${workspaceFolder}/Drivers/CMSIS/Include"
+                "${workspaceFolder}/Drivers/CMSIS/Include",
+
+                // ⭐ Keil AC6(armclang) 的标准库头文件（stdint.h / stddef.h ... 在这）
+                "C:/Keil_v5/ARM/ARMCLANG/include",
+                "C:/Keil_v5/ARM/ARMCLANG/lib/clang/20/include"
             ],
+
             "defines": [
                 "USE_HAL_DRIVER",
                 "STM32F427xx"
             ],
+
             "cStandard": "c99",
             "cppStandard": "c++17",
             "intelliSenseMode": "gcc-arm",
-            "compilerPath": "",
+
             "browse": {
                 "path": [
                     "${workspaceFolder}/Core",
                     "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
                     "${workspaceFolder}/Drivers/CMSIS/Include",
                     "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
-                    "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/include"
+                    "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/include",
+                    "C:/Keil_v5/ARM/ARMCLANG/include"
                 ],
                 "limitSymbolsToIncludedHeaders": true
             }
