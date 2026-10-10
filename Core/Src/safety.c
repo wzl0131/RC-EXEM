@@ -198,7 +198,7 @@ float Safety_Update(void)
     /* ---- ① 第一层：通信 / 硬件故障 ---- */
     if (Remote_IsOnline() == 0)
     {
-        fault |= FAULT_RC_OFFLINE;
+        fault |= FAULT_RC_OFFLINE;//按位或 不覆盖
     }
     if (M3508_IsOnline() == 0)
     {
