@@ -186,19 +186,38 @@ void Safety_Heartbeat(SafetyTaskId_t id)
 
 
 /* ============================================================================
- * 六、⭐ 核心：每 1ms 调一次 —— 收集故障 + 判心跳 + 喂狗
+ * 六、⭐ 核心之一：安全检查（收集故障 + 判任务心跳）
+ * ----------------------------------------------------------------------------
+ * ⚠️⚠️ 为什么要把"检查"和"喂狗"拆成两个函数？
+ *
+ *   一开始我把两件事写在同一个 Safety_Update() 里，只在 controlTask 调用。
+ *   后来发现一个大漏洞：
+ *
+ *      如果 controlTask 自己卡死了
+ *         → Safety_Update() 不跑了
+ *         → "检查心跳、记录是谁卡了"的代码也不跑了
+ *         → ⚠️ 结果"控制任务卡死"这件事【记录不下来】
+ *         → 复位后你只知道"看门狗咬过"，不知道是谁卡的
+ *
+ *      而"控制任务卡死"恰恰是最该被记录的场景！
+ *
+ *   ⭐ 所以拆开：
+ *      Safety_Check()    ← controlTask(1ms) 和 remoteTask(10ms) 【都调】
+ *                          只要还有一个任务活着，就能把"谁卡了"记下来 ✓
+ *      Safety_FeedDog()  ← 【只】在 controlTask 里调
+ *                          controlTask 卡死 → 没人喂狗 → 看门狗复位 ✓
  * ==========================================================================*/
-float Safety_Update(void)
+uint32_t Safety_Check(void)
 {
     const uint32_t now = osKernelGetTickCount();
     uint32_t fault     = FAULT_NONE;
     uint8_t  i;
-    uint8_t  task_alive = 1U;
 
-    /* ---- ① 第一层：通信 / 硬件故障 ---- */
+    /* ---- ① 第一层：通信 / 硬件故障 ----
+     * 用"按位或"累加：可以同时报多个故障，不会互相覆盖 */
     if (Remote_IsOnline() == 0)
     {
-        fault |= FAULT_RC_OFFLINE;//按位或 不覆盖
+        fault |= FAULT_RC_OFFLINE;
     }
     if (M3508_IsOnline() == 0)
     {
@@ -213,13 +232,13 @@ float Safety_Update(void)
         fault |= FAULT_OVER_TEMP;
     }
 
-    /* ---- ② 第三层：任务心跳 ---- */
+    /* ---- ② 第三层：任务心跳 ----
+     * 每个任务定期调 Safety_Heartbeat() 更新 s_hb_stamp[]，
+     * 这里看"距离上次上报过了多久"，超过阈值就判定它卡了 */
     for (i = 0U; i < SAFETY_TASK_COUNT; i++)
     {
         if ((now - s_hb_stamp[i]) > SAFETY_HB_TIMEOUT_MS)
         {
-            task_alive = 0U;                    /* 有任务卡死了 */
-
             if (i == SAFETY_TASK_CONTROL) { fault |= FAULT_TASK_CONTROL; }
             if (i == SAFETY_TASK_REMOTE)  { fault |= FAULT_TASK_REMOTE;  }
             if (i == SAFETY_TASK_DEBUG)   { fault |= FAULT_TASK_DEBUG;   }
@@ -227,33 +246,60 @@ float Safety_Update(void)
     }
 
     s_fault = fault;
+    return fault;
+}
 
-    /* ---- ③ ⭐ 喂狗 or 让狗咬 ----
-     *   所有任务都活着 → 喂狗（哪怕有通信故障也喂）
-     *   有任务卡死     → 不喂狗 → 500ms 后看门狗复位 */
-    if (task_alive != 0U)
+
+/* ============================================================================
+ * ⭐ 核心之二：喂狗 or 让狗咬（只在 controlTask 里调）
+ * ----------------------------------------------------------------------------
+ *   没有任务卡死 → 喂狗（⭐【哪怕有通信故障也喂】）
+ *   有任务卡死   → 不喂狗 → 500ms 后看门狗复位
+ *
+ * ⭐ 为什么通信故障照样喂狗？
+ *    那是"外部故障"（遥控器没电、线掉了），程序本身是健康的，
+ *    断电流就能恢复。这时复位反而让车莫名其妙重启，更危险。
+ * ⭐ 为什么任务卡死必须复位？
+ *    程序已经不能正常干活了，只能靠复位救回来。
+ * ==========================================================================*/
+void Safety_FeedDog(void)
+{
+    if ((s_fault & FAULT_TASK_MASK) == 0U)
     {
+        /* 所有任务都活着 → 喂狗 */
         HAL_IWDG_Refresh(&hiwdg);
         s_fault_recorded = 0U;
     }
     else if (s_fault_recorded == 0U)
     {
-        /* ⚠️ 只记一次 —— 备份寄存器写起来慢，不能每 1ms 写 */
-        BKP_FAULT = fault;
+        /* ⚠️ 只记一次 —— 备份寄存器写起来慢，不能每 1ms 写一次 */
+        BKP_FAULT = s_fault;
         s_fault_recorded = 1U;
     }
     else
     {
-        /* 已经记过了，什么都不做，等狗咬 */
+        /* 已经记过了，什么都不做，安静地等狗咬 */
     }
+}
 
-    /* ---- ④ 有通信故障 → 断电流 ---- */
+
+/* ============================================================================
+ * ⭐ 给 control.c 用的总入口（1ms 一次）
+ * ----------------------------------------------------------------------------
+ * 返回本次允许的电流幅值上限：
+ *     0     = 有通信故障，必须【立刻】断电流
+ *     16384 = 正常，不限制
+ * ==========================================================================*/
+float Safety_Update(void)
+{
+    const uint32_t fault = Safety_Check();
+
+    Safety_FeedDog();
+
     if ((fault & FAULT_COMM_MASK) != 0U)
     {
         return 0.0f;
     }
-
-    /* ---- ⑤ 一切正常 → 不限制 ---- */
     return PID_SPEED_OUT_MAX;
 }
 

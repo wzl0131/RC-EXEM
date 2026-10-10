@@ -189,6 +189,14 @@ void startRemoteTask(void *argument)
 
     Safety_Heartbeat(SAFETY_TASK_REMOTE);   /* ⭐ "我还活着" */
 
+    /* ⭐ 遥控任务也参与安全检查 —— 这是【故意】的！
+     *   如果只有 controlTask 做检查，那 controlTask 一旦卡死，
+     *   连"是谁卡了"都记录不下来。
+     *   两个任务都调 Safety_Check()，只要还有一个活着，
+     *   故障现场就能被记到备份寄存器里 ✓
+     *   （喂狗 Safety_FeedDog() 只在 controlTask 里调，所以不影响复位逻辑）*/
+    (void)Safety_Check();
+
     Control_RemoteUpdate();      /* 读遥控 + 判档位 + 算目标 */
   }
   /* USER CODE END startRemoteTask */

@@ -105,10 +105,19 @@ void     Safety_Init(void);
  *   调用周期：controlTask 1ms / remoteTask 10ms / debugTask 10ms */
 void     Safety_Heartbeat(SafetyTaskId_t id);
 
-/* ⭐ 每个控制周期调用一次（1kHz），返回本次允许的电流幅值上限
+/* ⭐ 检查故障 + 任务心跳，返回故障码（位掩码）
+ *   ⚠️ controlTask(1ms) 和 remoteTask(10ms) 【都调】它！
+ *      这样即使 controlTask 卡死，remoteTask 也能把"谁卡了"记下来 ✓ */
+uint32_t Safety_Check(void);
+
+/* ⭐ 根据最近一次 Safety_Check() 的结果决定喂狗还是让狗咬
+ *   ⚠️【只】在 controlTask 里调 —— controlTask 卡死就没人喂狗 → 复位 ✓ */
+void     Safety_FeedDog(void);
+
+/* ⭐ 给 control.c 用的总入口（1kHz），返回本次允许的电流幅值上限
  *   返回 0     = 有通信故障，必须【立刻】断电流
  *   返回 16384 = 正常，不限制
- *   内部还会根据心跳决定【喂狗还是让狗咬】*/
+ *   内部依次调 Safety_Check() + Safety_FeedDog() */
 float    Safety_Update(void);
 
 /* 读当前故障码（调试时加到 Watch 窗口看）*/
