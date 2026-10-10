@@ -186,3 +186,124 @@ can_motor.c   pid.c   remote.c   control.c   safety.c   debug.c
 
 **⭐ 注意：IntelliSense 报的红波浪线不一定真的错 —— 以 Keil 的编译结果为准。**
 **（比如它可能不认识 ARM 的内联汇编、`__weak` 这些 GCC/Keil 扩展）**
+
+
+---
+
+# 八、⚠️ 三个必须知道的环境坑（2026-10-10 踩过）
+
+## ① `compilerPath` 不能留空 —— 不然一片红波浪线
+
+**症状：**
+
+```
+打开 control.c，报：无法打开源文件 "stdint.h" (dependency of "control.h")
+代码里 CtrlMode_t / CTRL_MODE_STOP / 各种类型名全是红波浪线
+问题列表里几十个错
+```
+
+**原因：**
+
+```
+c_cpp_properties.json 里 "compilerPath": "" 是空的
+→ 微软 C/C++ 插件不知道去哪找【标准库头文件】
+→ 连 stdint.h 都找不到 → 整个工程什么都解析不了
+```
+
+**正确的配置：**
+
+```json
+"compilerPath": "C:/Keil_v5/ARM/ARMCLANG/bin/armclang.exe",
+"compilerArgs": ["--target=arm-arm-none-eabi", "-mcpu=cortex-m4",
+                 "-mfpu=fpv4-sp-d16", "-mfloat-abi=hard"],
+"includePath": [
+    ...（项目自己的 8 条路径）...
+    "C:/Keil_v5/ARM/ARMCLANG/include",
+    "C:/Keil_v5/ARM/ARMCLANG/lib/clang/20/include"
+]
+```
+
+**⭐ 怎么确定用哪个 clang 版本目录？** 让 armclang 自己打印搜索路径：
+
+```powershell
+armclang -c --target=arm-arm-none-eabi -mcpu=cortex-m4 t.c -o t.o -v
+# 看输出里的 -resource-dir
+# 我们这台机器是 C:\Keil_v5\ARM\ARMCLANG\lib\clang\20
+```
+
+## ② clangd 和 C/C++ 插件会打架
+
+**症状：**
+
+```
+弹提示：You have both the Microsoft C++ (cpptools) extension and
+       clangd extension enabled. The Microsoft IntelliSense features
+       conflict with clangd's code completion, diagnostics etc.
+```
+
+**怎么办：**
+
+```
+❌ 不要点 "Disable IntelliSense"
+   → 那会废掉我们辛苦配的 c_cpp_properties.json
+
+✅ 去扩展面板禁用 clangd：
+     Ctrl+Shift+X → 搜 clangd → 齿轮 ⚙ → 禁用
+     → 然后 Ctrl+Shift+P → "Reload Window"
+```
+
+**为什么禁用 clangd 而不是禁用微软 IntelliSense：**
+
+```
+c_cpp_properties.json 是给【微软 C/C++ 插件】用的
+clangd 不读这个文件 —— 它要 compile_commands.json
+Keil 工程生成那个清单很麻烦
+→ 所以用微软插件更省事 ✓
+```
+
+**⭐ 顺便：** 如果弹"是否切换到 C/C++ 预发行版" → 选【否】，用稳定版。
+
+## ③ 改完配置要重载窗口
+
+```
+Ctrl+Shift+P → 输入 "Reload Window" → 回车
+
+还不行：
+Ctrl+Shift+P → "C/C++: Select IntelliSense Configuration"
+   → 选 "STM32F427 (Keil AC6)"
+Ctrl+Shift+P → "C/C++: Reset IntelliSense Database"
+```
+
+---
+
+# 九、⭐ 改文件后要补 UTF-8 BOM
+
+**`.c` / `.h`（Keil 要）和 `.ps1`（Windows PowerShell 5.1 要）里的中文，都靠 BOM 才能正确显示。**
+
+```
+如果被某些编辑器保存成【无 BOM 的 UTF-8】：
+   · Keil 里 → 中文注释变乱码
+   · PowerShell 里 → 中文乱码，甚至报语法错误
+```
+
+**补 BOM 的方法（PowerShell 里跑）：**
+
+```powershell
+$p = 'C:\RM\teach\TEST\.vscode\build.ps1'
+$b = [System.IO.File]::ReadAllBytes($p)
+if (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)) {
+    [System.IO.File]::WriteAllBytes($p, ([byte[]](0xEF,0xBB,0xBF) + $b))
+}
+```
+
+**⭐ 一次补一批：**
+
+```powershell
+Get-ChildItem 'C:\RM\teach\TEST\Core' -Recurse -Include *.c,*.h | ForEach-Object {
+    $b = [System.IO.File]::ReadAllBytes($_.FullName)
+    if (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)) {
+        [System.IO.File]::WriteAllBytes($_.FullName, ([byte[]](0xEF,0xBB,0xBF) + $b))
+        Write-Host "补了 BOM: $($_.Name)"
+    }
+}
+```
