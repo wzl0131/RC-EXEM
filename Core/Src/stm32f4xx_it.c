@@ -98,7 +98,8 @@ extern TIM_HandleTypeDef htim1;
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-  Safety_FaultHandler();       /* 记录 + 亮灯 + 不喂狗 → 等看门狗复位 */
+  SAFETY_CAPTURE_FAULT_SP();   /* ⭐ 必须第一句：取异常栈帧地址（晚了 LR 就被覆盖）*/
+  Safety_FaultHandler(fault_sp_);
   /* USER CODE END NonMaskableInt_IRQn 0 */
   while (1)
   {
@@ -113,7 +114,8 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-  Safety_FaultHandler();       /* ⭐ 记录崩溃 PC → 亮红灯 → 等狗咬 */
+  SAFETY_CAPTURE_FAULT_SP();   /* ⭐ 必须第一句：取异常栈帧地址（晚了 LR 就被覆盖）*/
+  Safety_FaultHandler(fault_sp_);
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -126,7 +128,8 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-  Safety_FaultHandler();
+  SAFETY_CAPTURE_FAULT_SP();   /* ⭐ 必须第一句：取异常栈帧地址（晚了 LR 就被覆盖）*/
+  Safety_FaultHandler(fault_sp_);
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
   {
@@ -139,7 +142,8 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-  Safety_FaultHandler();
+  SAFETY_CAPTURE_FAULT_SP();   /* ⭐ 必须第一句：取异常栈帧地址（晚了 LR 就被覆盖）*/
+  Safety_FaultHandler(fault_sp_);
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
   {
@@ -152,7 +156,8 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-  Safety_FaultHandler();
+  SAFETY_CAPTURE_FAULT_SP();   /* ⭐ 必须第一句：取异常栈帧地址（晚了 LR 就被覆盖）*/
+  Safety_FaultHandler(fault_sp_);
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
   {

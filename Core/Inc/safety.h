@@ -133,8 +133,58 @@ uint16_t Safety_GetResetCount(void);
 uint32_t Safety_GetHeartbeatAge(SafetyTaskId_t id);
 
 /* ⭐ 给 stm32f4xx_it.c 里的 Fault_Handler 调用
+ *   参数 fault_sp = 异常栈帧的起始地址（用下面的宏取）
  *   作用：记录故障码和崩溃地址 → 亮红灯 → 不喂狗 → 等看门狗复位 */
-void     Safety_FaultHandler(void);
+void     Safety_FaultHandler(uint32_t fault_sp);
+
+
+/* ============================================================================
+ * ⭐⭐ 取异常栈帧地址的宏（必须在 Fault_Handler 的【第一行】用！）
+ * ----------------------------------------------------------------------------
+ * 原理：
+ *   Cortex-M4 进异常时，硬件自动把 8 个寄存器压栈：
+ *       R0, R1, R2, R3, R12, LR, PC, xPSR
+ *   同时把 LR 设成 EXC_RETURN（0xFFFFFFF9 或 0xFFFFFFFD）：
+ *       bit2 = 0  → 异常前用的是 MSP（主栈）
+ *       bit2 = 1  → 异常前用的是 PSP（任务栈，FreeRTOS 任务跑在 PSP 上）
+ *   所以要先看 LR 的 bit2 决定查哪个栈，才能拿到正确的栈帧地址。
+ *
+ * ⚠️⚠️ 为什么必须写成【宏】而不是函数？
+ *   因为 BL 指令会把 LR 覆盖成"返回地址"！
+ *   一旦调用了任何函数，LR 里就不再是 EXC_RETURN 了，
+ *   再去 TST LR,#4 就是拿"某个返回地址的 bit2"在瞎猜，
+ *   有一半概率查错栈 → 读出来的崩溃地址是垃圾。
+ *
+ *   写成宏 → 编译时直接展开到 handler 函数体里 → 不产生 BL → LR 是好的 ✓
+ *
+ * 用法（在 stm32f4xx_it.c 的每个 Fault_Handler 里）：
+ *
+ *     void HardFault_Handler(void)
+ *     {
+ *       SAFETY_CAPTURE_FAULT_SP();      // ⭐ 必须是函数体第一条语句
+ *       Safety_FaultHandler(fault_sp);  // 之后怎么调用都行
+ *       while (1) { }
+ *     }
+ *
+ * 展开后会声明一个局部变量 fault_sp（uint32_t），存放异常栈帧地址。
+ * ==========================================================================*/
+
+#define SAFETY_CAPTURE_FAULT_SP()                                       \
+    uint32_t fault_sp_;                                                 \
+    __asm volatile (                                                    \
+        "TST    LR, #4          \n"   /* 测 EXC_RETURN 的 bit2        */ \
+        "ITE    EQ              \n"   /* If-Then-Else，条件 = 相等     */ \
+        "MRSEQ  %0, MSP         \n"   /* bit2==0 → 栈帧在 MSP 上      */ \
+        "MRSNE  %0, PSP         \n"   /* bit2==1 → 栈帧在 PSP 上      */ \
+        : "=r" (fault_sp_) :: "cc")
+
+
+/* ⭐ 从异常栈帧里取崩溃地址（PC）
+ *   fault_sp 是 SAFETY_CAPTURE_FAULT_SP() 取到的栈帧地址
+ *   栈帧里的第 7 个字（偏移 24）就是 PC —— 崩在哪条指令
+ *
+ *   拿这个地址去 MDK-ARM\TEST\TEST.map 里查，就知道崩在哪个函数 */
+uint32_t Safety_GetPCFromFrame(uint32_t fault_sp);
 
 
 /* ============================================================================

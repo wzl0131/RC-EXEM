@@ -87,21 +87,18 @@ static uint16_t s_reset_count  = 0U;
  * Cortex-M4 进异常时，硬件会自动把 8 个寄存器压栈：
  *     R0, R1, R2, R3, R12, LR, PC, xPSR
  * 其中 PC（第 7 个字，偏移 24 字节）就是【崩在哪条指令】
+ *
+ * ⚠️⚠️ 注意：取"栈帧地址"的动作【不能】在这里做！
+ *    因为 BL 指令会覆盖 LR，函数一被调用，LR 里就不再是 EXC_RETURN 了。
+ *    所以查 MSP/PSP 那步是用【宏】SAFETY_CAPTURE_FAULT_SP()
+ *    写在 stm32f4xx_it.c 的 Fault_Handler 第一行（见 safety.h 的说明）。
+ *
+ *    这个函数只负责"给定栈帧地址，读出 PC"，不碰 LR，所以安全 ✓
  * ==========================================================================*/
-static uint32_t Fault_GetPC(void)
+uint32_t Safety_GetPCFromFrame(uint32_t fault_sp)
 {
-    uint32_t pc;
-
-    __asm volatile (
-        "TST    LR, #4          \n"   /* 判断进异常前用的是 MSP 还是 PSP */
-        "ITE    EQ              \n"
-        "MRSEQ  R0, MSP         \n"
-        "MRSNE  R0, PSP         \n"
-        "LDR    %0, [R0, #24]   \n"   /* 栈帧偏移 24 = PC */
-        : "=r" (pc) : : "r0"
-    );
-
-    return pc;
+    /* 栈帧里的第 7 个字（偏移 24 = 6 × 4）就是 PC */
+    return ((const uint32_t *)fault_sp)[6];
 }
 
 
@@ -263,12 +260,16 @@ float Safety_Update(void)
 
 /* ============================================================================
  * 七、⭐ 给 stm32f4xx_it.c 里的 Fault_Handler 调用
+ * ----------------------------------------------------------------------------
+ * ⚠️ 参数 fault_sp 是【异常栈帧的地址】，必须由调用者在 handler 的
+ *    第一行用宏 SAFETY_CAPTURE_FAULT_SP() 取出来再传进来。
+ *    不能在这个函数里自己取 —— 因为走到这里时 LR 已经被 BL 覆盖了。
  * ==========================================================================*/
-void Safety_FaultHandler(void)
+void Safety_FaultHandler(uint32_t fault_sp)
 {
-    /* ---- ① 记录：故障码 + 崩溃地址 ---- */
+    /* ---- ① 记录：故障码 + 崩溃地址（从栈帧里读 PC）---- */
     BKP_FAULT    = s_fault | FAULT_HARDFAULT;
-    BKP_FAULT_PC = Fault_GetPC();
+    BKP_FAULT_PC = Safety_GetPCFromFrame(fault_sp);
 
     /* ---- ② 亮红灯（告诉人"我崩了"）---- */
     HAL_GPIO_WritePin(LED_RED_GPIO_Port, LED_RED_Pin, GPIO_PIN_SET);
