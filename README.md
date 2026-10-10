@@ -40,7 +40,7 @@
 dbg_safety_fault        当前故障码（位掩码，能同时报多个）
 dbg_safety_last_fault   上次复位前的故障码
 dbg_safety_fault_pc     上次崩溃的地址
-dbg_safety_reset        低 8 位 = 复位原因（1 = 看门狗复位）/ 高 8 位 = 复位次数
+dbg_safety_reset        复位原因（1 = 看门狗复位）/ 高 8 位 = 复位次数
 dbg_safety_hb           三个任务的心跳"年龄"
 ```
 
@@ -245,7 +245,7 @@ Safety_Update()（在 controlTask 里，1ms 一次）检查心跳：
 ```
 dbg_safety_last_fault   上次复位前的故障码（0 = 上次是正常复位）
 dbg_safety_fault_pc     上次崩溃的地址 → 去 TEST.map 里查是哪个函数
-dbg_safety_reset        低 8 位 = 复位原因（1 = 看门狗复位）
+dbg_safety_reset        复位原因（1 = 看门狗复位）
                         高 8 位 = 复位次数
 dbg_safety_hb           三个任务的心跳"年龄"（正常都应该是 0~10）
 ```
@@ -353,11 +353,11 @@ dbg_safety_hb           三个任务的心跳"年龄"（正常都应该是 0~10�
 |---|---|---|
 | 自测通过 | 上电 | 绿灯 500ms 闪，`dbg_safety_fault = 0` |
 | 任务心跳正常 | J-Scope 看 `dbg_safety_hb` | 三个字节都在 0~10 |
-| 喂狗正常 | 上电后不管它，看 `dbg_safety_reset` | 低 8 位一直是 3（上电复位），说明没被狗咬 |
+| 喂狗正常 | 上电后不管它，看 `dbg_safety_reset_reason` | 低 8 位一直是 3（上电复位），说明没被狗咬 |
 | 任务卡死检测 | 在 controlTask 里临时加 `while(1);` | 200ms 后 `dbg_safety_fault` = bit5，500ms 后板子复位 |
-| 看门狗复位 | 复位后看 `dbg_safety_reset` | 低 8 位 = 1（IWDG 复位）|
+| 看门狗复位 | 复位后看 `dbg_safety_reset_reason` | 低 8 位 = 1（IWDG 复位）|
 | HardFault 记录 | 临时调一个空函数指针 | 红灯常亮 → 复位，`dbg_safety_last_fault` 含 bit4，`dbg_safety_fault_pc` 非 0 |
-| 复位次数累加 | 复位几次 | `dbg_safety_reset` 高 8 位递增 |
+| 复位次数累加 | 复位几次 | `dbg_safety_reset_count`递增 |
 
 ### ⚠️ 上机配置（如果换电脑要重新配）
 
