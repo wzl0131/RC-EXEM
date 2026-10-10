@@ -5,19 +5,16 @@
     //  ⚠️ VSCode 调试 / Keil 调试 / J-Scope 三者【不能同时用】
     //     （都要独占 J-Link）
     //     用 VSCode 调试前，先在 Keil / J-Scope 里停掉
+    //
+    //  ⭐ 用的时候：左边栏【运行和调试】(Ctrl+Shift+D)
+    //     → 顶部下拉框选 "J-Link 调试（先编译）"  ← 选这个！
+    //     → 按 F5
+    //
+    //  ⚠️ 不要选 "Debug with ST-Link" —— 那个是 VSCode 自动生成的模板，
+    //     指向不存在的 bin/executable.elf，会报 "Unable to find executable file"
     // ========================================================================
     "version": "0.2.0",
     "configurations": [
-        {
-            "cwd": "${workspaceFolder}",
-            "executable": "./bin/executable.elf",
-            "name": "Debug with ST-Link",
-            "request": "launch",
-            "type": "cortex-debug",
-            "runToEntryPoint": "main",
-            "showDevDebugOutput": "none",
-            "servertype": "stlink"
-        },
         {
             "name": "J-Link 调试（先编译）",
             "type": "cortex-debug",
