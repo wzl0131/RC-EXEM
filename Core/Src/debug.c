@@ -21,15 +21,26 @@ volatile float dbg_target_rpm = 0.0f;
 volatile float dbg_actual_rpm = 0.0f;
 volatile float dbg_pid_out    = 0.0f;
 
-/* ⭐ 安全中心的状态（J-Scope 里也能看到故障码）*/
-volatile uint32_t dbg_safety_fault      = 0U;
-volatile uint32_t dbg_safety_last_fault = 0U;
-volatile uint32_t dbg_safety_fault_pc   = 0U;
-volatile uint32_t dbg_safety_reset      = 0U;
-volatile uint32_t dbg_safety_hb         = 0U;
+/* ⭐ 安全中心的状态（拆成 8 个独立变量，J-Scope 里一眼看得懂）*/
+volatile uint32_t dbg_safety_fault        = 0U;
+volatile uint32_t dbg_safety_last_fault   = 0U;
+volatile uint32_t dbg_safety_fault_pc     = 0U;
+volatile uint32_t dbg_safety_reset_reason = 0U;
+volatile uint32_t dbg_safety_reset_count  = 0U;
+volatile uint32_t dbg_safety_hb_ctrl      = 0U;
+volatile uint32_t dbg_safety_hb_remote    = 0U;
+volatile uint32_t dbg_safety_hb_debug     = 0U;
 
 
-/* 心跳"年龄"超过 255ms 就按 255 算（一个字节装不下更多）*/
+/* ============================================================================
+ * 心跳"年龄"超过 255 ms 就按 255 算
+ * ----------------------------------------------------------------------------
+ * 为什么要限幅？
+ *   J-Scope 的 Y 轴是按数据范围自动缩放的。
+ *   如果某个任务卡死了，年龄会一直涨到几十万毫秒，
+ *   那样正常值（0~10）在图上就看不见了。
+ *   限到 255 之后，"正常(0~10)"和"卡死(255)"在一张图上都看得清 ✓
+ * ==========================================================================*/
 static uint32_t ClampAge(uint32_t age)
 {
     return (age > 255U) ? 255U : age;
@@ -47,20 +58,28 @@ void Debug_Update(void)
     dbg_actual_rpm = motor1.out_rpm;            /* 速度环反馈 */
     dbg_pid_out    = pid_speed.output;          /* 速度环输出 = 发给电调的电流 */
 
-    /* ⭐ 安全中心的状态
-     *   J-Scope 里重点看：
-     *     dbg_safety_fault      非 0 → 有故障了（看是哪一位）
-     *     dbg_safety_last_fault 非 0 → 上次复位前也出过故障
-     *     dbg_safety_reset      低 8 位 = 复位原因（1 = 看门狗复位）
-     *     dbg_safety_hb         三个任务的心跳年龄（正常都应该是 0~10）*/
-    dbg_safety_fault      = Safety_GetFault();
-    dbg_safety_last_fault = Safety_GetLastFault();
-    dbg_safety_fault_pc   = Safety_GetFaultPC();
-    dbg_safety_reset      = (uint32_t)Safety_GetResetReason()
-                          | ((uint32_t)Safety_GetResetCount() << 8);
-    dbg_safety_hb         =  ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_CONTROL))
-                          | (ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_REMOTE)) << 8)
-                          | (ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_DEBUG))  << 16);
+    /* ⭐ 安全中心的状态（拆成独立的变量，J-Scope 里一眼看得懂）
+     *
+     *   正常运行时应该长这样：
+     *     dbg_safety_fault         = 0
+     *     dbg_safety_last_fault    = 0
+     *     dbg_safety_fault_pc      = 0
+     *     dbg_safety_reset_reason  = 3      （上电复位）
+     *     dbg_safety_reset_count   = 1
+     *     dbg_safety_hb_*          = 0~10   （三个任务都很勤快）
+     */
+    dbg_safety_fault          = Safety_GetFault();
+    dbg_safety_last_fault     = Safety_GetLastFault();
+    dbg_safety_fault_pc       = Safety_GetFaultPC();
+    dbg_safety_reset_reason   = (uint32_t)Safety_GetResetReason();
+    dbg_safety_reset_count    = (uint32_t)Safety_GetResetCount();
+
+    /* 心跳"年龄"：距离上次上报过了多少毫秒。
+     * 用 ClampAge 限到 255 —— 因为 J-Scope 的 Y 轴分辨率有限，
+     * 画出来看得清"是 5 还是 200"就够了，不需要精确到毫秒 */
+    dbg_safety_hb_ctrl        = ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_CONTROL));
+    dbg_safety_hb_remote      = ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_REMOTE));
+    dbg_safety_hb_debug       = ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_DEBUG));
 }
 
 

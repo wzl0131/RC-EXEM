@@ -36,16 +36,32 @@ extern volatile float dbg_pid_out;       /* PID 输出（= 发给电调的电流
  * 为什么需要这几个？
  *   安全中心内部的状态是 static 的，而且接口是【函数】——
  *   J-Scope 的 HSS 模式只能读 RAM 里的【全局变量】，读不了函数返回值。
- *   所以这里把关键状态搬到扁平全局变量，用 J-Scope 也能看到故障码。
+ *   所以这里把关键状态搬到扁平全局变量。
  *
- * ⭐ 用法：J-Scope 里搜 "dbg_" 就能找到，直接看数值
- *          （dbg_safety_fault 变成非 0 就说明有故障了）
+ * ⭐ 用法：J-Scope 里搜 "dbg_safety" 就能找到这 8 个，直接看数值
+ *
+ * ⚠️ 为什么不打包成一个数？
+ *   之前我把"三个心跳"打包进一个 32 位变量、把"复位原因+次数"也打包了，
+ *   省是省了，但 J-Scope 里显示十进制根本看不懂。
+ *   现场要一眼能判断，所以拆成 8 个独立的变量 ✓
  * ==========================================================================*/
-extern volatile uint32_t dbg_safety_fault;       /* 当前故障码（位掩码）*/
-extern volatile uint32_t dbg_safety_last_fault;  /* 上次复位前的故障码 */
-extern volatile uint32_t dbg_safety_fault_pc;    /* 上次崩溃的地址 */
-extern volatile uint32_t dbg_safety_reset;       /* bit7-0=复位原因 bit23-8=复位次数 */
-extern volatile uint32_t dbg_safety_hb;          /* 三个任务的心跳计数（看有没有不涨的）*/
+
+/* ---- 故障码（位掩码，可以同时有多个故障）---- */
+extern volatile uint32_t dbg_safety_fault;          /* 当前故障码 */
+extern volatile uint32_t dbg_safety_last_fault;     /* 上次复位【前】的故障码 */
+
+/* ---- 崩溃记录 ---- */
+extern volatile uint32_t dbg_safety_fault_pc;       /* 上次崩溃的地址（去 map 里查）*/
+
+/* ---- 复位信息（拆开了，一眼能看懂）---- */
+extern volatile uint32_t dbg_safety_reset_reason;   /* 复位原因：1=看门狗 2=软件 3=上电 4=引脚 */
+extern volatile uint32_t dbg_safety_reset_count;    /* 复位次数 */
+
+/* ---- 三个任务的心跳"年龄"（毫秒）
+ *      正常都应该 < 20；超过 200 就说明那个任务卡死了 ---- */
+extern volatile uint32_t dbg_safety_hb_ctrl;        /* 控制任务 controlTask  */
+extern volatile uint32_t dbg_safety_hb_remote;      /* 遥控任务 remoteTask   */
+extern volatile uint32_t dbg_safety_hb_debug;       /* 心跳任务 debugTask    */
 
 
 /* ============================================================================
