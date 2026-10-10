@@ -127,6 +127,11 @@ uint8_t  Safety_GetResetReason(void);
 /* 读复位次数（上电后清零）*/
 uint16_t Safety_GetResetCount(void);
 
+/* ⭐ 读某个任务"距离上次心跳过了多少毫秒"
+ *   正常应该 < SAFETY_HB_TIMEOUT_MS（200），超过就说明它卡了
+ *   给 debug 模块打包到 J-Scope 变量里用 */
+uint32_t Safety_GetHeartbeatAge(SafetyTaskId_t id);
+
 /* ⭐ 给 stm32f4xx_it.c 里的 Fault_Handler 调用
  *   作用：记录故障码和崩溃地址 → 亮红灯 → 不喂狗 → 等看门狗复位 */
 void     Safety_FaultHandler(void);

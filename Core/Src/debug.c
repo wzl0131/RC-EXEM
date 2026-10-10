@@ -9,6 +9,7 @@
 #include "can_motor.h"      /* motor1 */
 #include "pid.h"            /* pid_speed.output */
 #include "control.h"        /* Control_GetTargetDeg / GetTargetRpm */
+#include "safety.h"         /* ⭐ 安全中心的状态 */
 
 
 /* ============================================================================
@@ -19,6 +20,20 @@ volatile float dbg_actual_deg = 0.0f;
 volatile float dbg_target_rpm = 0.0f;
 volatile float dbg_actual_rpm = 0.0f;
 volatile float dbg_pid_out    = 0.0f;
+
+/* ⭐ 安全中心的状态（J-Scope 里也能看到故障码）*/
+volatile uint32_t dbg_safety_fault      = 0U;
+volatile uint32_t dbg_safety_last_fault = 0U;
+volatile uint32_t dbg_safety_fault_pc   = 0U;
+volatile uint32_t dbg_safety_reset      = 0U;
+volatile uint32_t dbg_safety_hb         = 0U;
+
+
+/* 心跳"年龄"超过 255ms 就按 255 算（一个字节装不下更多）*/
+static uint32_t ClampAge(uint32_t age)
+{
+    return (age > 255U) ? 255U : age;
+}
 
 
 /* ============================================================================
@@ -31,6 +46,21 @@ void Debug_Update(void)
     dbg_target_rpm = Control_GetTargetRpm();    /* 速度环目标（位置模式下 = 位置环输出）*/
     dbg_actual_rpm = motor1.out_rpm;            /* 速度环反馈 */
     dbg_pid_out    = pid_speed.output;          /* 速度环输出 = 发给电调的电流 */
+
+    /* ⭐ 安全中心的状态
+     *   J-Scope 里重点看：
+     *     dbg_safety_fault      非 0 → 有故障了（看是哪一位）
+     *     dbg_safety_last_fault 非 0 → 上次复位前也出过故障
+     *     dbg_safety_reset      低 8 位 = 复位原因（1 = 看门狗复位）
+     *     dbg_safety_hb         三个任务的心跳年龄（正常都应该是 0~10）*/
+    dbg_safety_fault      = Safety_GetFault();
+    dbg_safety_last_fault = Safety_GetLastFault();
+    dbg_safety_fault_pc   = Safety_GetFaultPC();
+    dbg_safety_reset      = (uint32_t)Safety_GetResetReason()
+                          | ((uint32_t)Safety_GetResetCount() << 8);
+    dbg_safety_hb         =  ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_CONTROL))
+                          | (ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_REMOTE)) << 8)
+                          | (ClampAge(Safety_GetHeartbeatAge(SAFETY_TASK_DEBUG))  << 16);
 }
 
 

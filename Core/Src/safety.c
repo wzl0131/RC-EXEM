@@ -277,6 +277,16 @@ uint32_t Safety_GetFaultPC(void)     { return s_fault_pc;   }
 uint8_t  Safety_GetResetReason(void) { return s_reset_reason; }
 uint16_t Safety_GetResetCount(void)  { return s_reset_count;  }
 
+/* ⭐ 某个任务距离上次心跳过了多少毫秒（给 debug 模块打包用）*/
+uint32_t Safety_GetHeartbeatAge(SafetyTaskId_t id)
+{
+    if ((uint8_t)id >= SAFETY_TASK_COUNT)
+    {
+        return 0U;
+    }
+    return osKernelGetTickCount() - s_hb_stamp[id];
+}
+
 
 /* ============================================================================
  * 九、自测
